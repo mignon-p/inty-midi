@@ -33,6 +33,21 @@ indent = "    "
 maxChannels :: Channel
 maxChannels = 3
 
+sustained :: [NoteValue]
+sustained = replicate (fromIntegral maxChannels) (-2)
+
+mergeNotes :: [Note] -> ChannelSet -> [NoteValue] -> ([NoteValue], ChannelSet)
+mergeNotes [] playing nvs = (nvs, playing)
+mergeNotes (note:rest) playing nvs = mergeNotes rest playing' nvs'
+
+convertNotes :: AbsTime -> [Note] -> ChannelSet -> [[NoteValue]]
+convertNotes _ [] _ = []
+convertNotes now notes playing =
+  let (current, future) = partition isCurrent notes
+      isCurrent note = nTime note == now
+      (nvs, playing') = mergeNotes current playing sustained
+  in nvs : convertNotes (now + 1) future playing'
+
 channelsUsed :: [Note] -> ChannelSet
 channelsUsed = foldr addCh 0
   where addCh note acc = acc .|. bit (fromIntegral (nChan note))
