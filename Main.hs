@@ -1,6 +1,7 @@
 module Main where
 
 import Data.Char
+import Data.Containers.ListUtils
 import Data.Int
 import Data.List
 import Data.Ord
@@ -16,10 +17,19 @@ type AbsTime = Word64
 type Channel = Word8
 type NoteValue = Int16
 type AbsMidiMessage = (AbsTime, MidiEvent)
-data Note = Note !AbsTime !Channel !NoteValue
+data Note = Note
+  { nTime :: !AbsTime
+  , nChan :: !Channel
+  , nVal  :: !NoteValue
+  } deriving (Eq, Ord, Show)
 
 indent :: String
 indent = "    "
+
+findDivisor :: [Note] -> AbsTime
+findDivisor notes =
+  let times = nubOrd $ map nTime notes
+  in foldr gcd 0 times
 
 getNotes :: [AbsMidiMessage] -> [Note]
 getNotes [] = []
@@ -39,8 +49,8 @@ getMetaLines (_:rest) = getMetaLines rest
 
 getMusicLines :: [AbsMidiMessage] -> Either ErrMsg [String]
 getMusicLines msgs =
-  let voiceEvs = getNotes msgs
-  in Right ["TODO"]
+  let notes = nubOrd $ getNotes msgs
+  in Right [show $ findDivisor notes]
 
 absolutify :: AbsTime -> [MidiMessage] -> [AbsMidiMessage]
 absolutify _ [] = []
