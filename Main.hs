@@ -1,8 +1,10 @@
 module Main where
 
+import Data.Bits
 import Data.Char
 import Data.Containers.ListUtils
 import Data.Int
+import qualified Data.IntMap.Strict as IM
 import Data.List
 import Data.Ord
 import Data.Word
@@ -22,9 +24,43 @@ data Note = Note
   , nChan :: !Channel
   , nVal  :: !NoteValue
   } deriving (Eq, Ord, Show)
+type ChannelSet = Word16
+type ChannelMap = IM.IntMap Channel
 
 indent :: String
 indent = "    "
+
+maxChannels :: Channel
+maxChannels = 3
+
+channelsUsed :: [Note] -> ChannelSet
+channelsUsed = foldr addCh 0
+  where addCh note acc = acc .|. bit (fromIntegral (nChan note))
+
+channelList :: ChannelSet -> [Channel]
+channelList cs = chkChan 0
+  where chkChan 16 = []
+        chkChan x =
+          if testBit cs (fromIntegral x)
+          then x : chkChan (x + 1)
+          else chkChan (x + 1)
+
+makeChannelMap :: ChannelSet -> ChannelMap
+makeChannelMap cs =
+  let clist = map fromIntegral $ channelList cs
+      cmap = zip clist [0..maxChannels-1]
+  in IM.fromList cmap
+
+mapChannels :: ChannelMap -> [Note] -> [Note]
+mapChannels _ [] = []
+mapChannels cm (note:rest) =
+  case IM.lookup (fromIntegral $ nChan note) cm of
+    Just ch -> note { nChan = ch } : mapChannels cm rest
+    _ -> mapChannels cm rest
+
+divTime :: AbsTime -> [Note] -> [Note]
+divTime divisor = map dt
+  where dt note = note { nTime = nTime note `div` divisor }
 
 findDivisor :: [Note] -> AbsTime
 findDivisor notes =
@@ -50,7 +86,10 @@ getMetaLines (_:rest) = getMetaLines rest
 getMusicLines :: [AbsMidiMessage] -> Either ErrMsg [String]
 getMusicLines msgs =
   let notes = nubOrd $ getNotes msgs
-  in Right [show $ findDivisor notes]
+      notes' = mapChannels (makeChannelMap (channelsUsed notes)) notes
+      divisor = findDivisor notes'
+      notes'' = divTime divisor notes'
+  in Right [show divisor]
 
 absolutify :: AbsTime -> [MidiMessage] -> [AbsMidiMessage]
 absolutify _ [] = []
