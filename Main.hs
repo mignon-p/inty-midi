@@ -43,10 +43,10 @@ namesForOctave octave = map insertOct noteNames
         insertOct (letter:accidental) = letter : octStr ++ accidental
 
 allNoteNames :: [String]
-allNoteNames = concatMap namesForOctave [0..9]
+allNoteNames = concatMap namesForOctave [2..7]
 
 noteList :: [(Int, String)]
-noteList = zip [12..127] allNoteNames
+noteList = zip [36..96] allNoteNames
 
 noteMap :: NoteMap
 noteMap = IM.fromList $ (-2, "S") : noteList
