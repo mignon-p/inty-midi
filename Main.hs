@@ -33,19 +33,39 @@ indent = "    "
 maxChannels :: Channel
 maxChannels = 3
 
-sustained :: [NoteValue]
-sustained = replicate (fromIntegral maxChannels) (-2)
+formatNote :: NoteValue -> String
+formatNote = undefined
 
-mergeNotes :: [Note] -> ChannelSet -> [NoteValue] -> ([NoteValue], ChannelSet)
-mergeNotes [] playing nvs = (nvs, playing)
-mergeNotes (note:rest) playing nvs = mergeNotes rest playing' nvs'
+formatLine :: [NoteValue] -> String
+formatLine nvs = indent ++ "MUSIC " ++ intercalate "," (map formatNote nvs)
+
+nvsFromPlaying :: ChannelSet -> [NoteValue]
+nvsFromPlaying cs = map f [0 .. fromIntegral maxChannels - 1]
+  where f n = if testBit cs n then (-2) else (-1)
+
+playingFromNvs :: [NoteValue] -> ChannelSet
+playingFromNvs [] = 0
+playingFromNvs (nv:nvs) = f nv .|. (playingFromNvs nvs `shiftL` 1)
+  where f (-1) = 0
+        f _ = 1
+
+setElem :: [a] -> Int -> a -> [a]
+setElem xs idx x =
+  let (before, (_:after)) = splitAt idx xs
+  in before ++ x : after
+
+mergeNotes :: [Note] -> [NoteValue] -> [NoteValue]
+mergeNotes [] nvs = nvs
+mergeNotes (note:rest) nvs = mergeNotes rest nvs'
+  where nvs' = setElem nvs (fromIntegral $ nChan note) (nVal note)
 
 convertNotes :: AbsTime -> [Note] -> ChannelSet -> [[NoteValue]]
 convertNotes _ [] _ = []
 convertNotes now notes playing =
   let (current, future) = partition isCurrent notes
       isCurrent note = nTime note == now
-      (nvs, playing') = mergeNotes current playing sustained
+      nvs = mergeNotes current (nvsFromPlaying playing)
+      playing' = playingFromNvs nvs
   in nvs : convertNotes (now + 1) future playing'
 
 channelsUsed :: [Note] -> ChannelSet
@@ -104,7 +124,8 @@ getMusicLines msgs =
       notes' = mapChannels (makeChannelMap (channelsUsed notes)) notes
       divisor = findDivisor notes'
       notes'' = divTime divisor notes'
-  in Right [show divisor]
+      intyNotes = convertNotes 0 notes'' 0
+  in Right $ map formatLine intyNotes
 
 absolutify :: AbsTime -> [MidiMessage] -> [AbsMidiMessage]
 absolutify _ [] = []
