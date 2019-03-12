@@ -1,6 +1,7 @@
 module Main where
 
 import Data.Char
+import Data.Int
 import Data.List
 import Data.Ord
 import Data.Word
@@ -11,10 +12,23 @@ import ZMidi.Core.Canonical
 import ZMidi.Core.Datatypes
 import ZMidi.Core.ReadFile
 
-type AbsMidiMessage = (Integer, MidiEvent)
+type AbsTime = Word64
+type Channel = Word8
+type NoteValue = Int16
+type AbsMidiMessage = (AbsTime, MidiEvent)
+data Note = Note !AbsTime !Channel !NoteValue
 
 indent :: String
 indent = "    "
+
+getNotes :: [AbsMidiMessage] -> [Note]
+getNotes [] = []
+getNotes ((t, VoiceEvent _ (NoteOn ch note vel)):rest) =
+  let note' = if vel == 0 then (-1) else fromIntegral note
+  in Note t ch note' : getNotes rest
+getNotes ((t, VoiceEvent _ (NoteOff ch _ _)):rest) =
+  Note t ch (-1) : getNotes rest
+getNotes (_:rest) = getNotes rest
 
 getMetaLines :: [AbsMidiMessage] -> [String]
 getMetaLines [] = []
@@ -24,9 +38,11 @@ getMetaLines ((_, MetaEvent (TextEvent typ str)):rest) =
 getMetaLines (_:rest) = getMetaLines rest
 
 getMusicLines :: [AbsMidiMessage] -> Either ErrMsg [String]
-getMusicLines _ = Right ["TODO"]
+getMusicLines msgs =
+  let voiceEvs = getNotes msgs
+  in Right ["TODO"]
 
-absolutify :: Integer -> [MidiMessage] -> [AbsMidiMessage]
+absolutify :: AbsTime -> [MidiMessage] -> [AbsMidiMessage]
 absolutify _ [] = []
 absolutify now ((delta, ev):rest) =
   let next = now + fromIntegral delta
