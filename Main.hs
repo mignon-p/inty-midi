@@ -26,6 +26,7 @@ data Note = Note
   } deriving (Eq, Ord, Show)
 type ChannelSet = Word16
 type ChannelMap = IM.IntMap Channel
+type NoteMap = IM.IntMap String
 
 indent :: String
 indent = "    "
@@ -33,8 +34,25 @@ indent = "    "
 maxChannels :: Channel
 maxChannels = 3
 
+noteNames :: [String]
+noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+namesForOctave :: Int -> [String]
+namesForOctave octave = map insertOct noteNames
+  where octStr = show octave
+        insertOct (letter:accidental) = letter : octStr ++ accidental
+
+allNoteNames :: [String]
+allNoteNames = concatMap namesForOctave [0..9]
+
+noteList :: [(Int, String)]
+noteList = zip [12..127] allNoteNames
+
+noteMap :: NoteMap
+noteMap = IM.fromList $ (-2, "S") : noteList
+
 formatNote :: NoteValue -> String
-formatNote = undefined
+formatNote nv = IM.findWithDefault "-" (fromIntegral nv) noteMap
 
 formatLine :: [NoteValue] -> String
 formatLine nvs = indent ++ "MUSIC " ++ intercalate "," (map formatNote nvs)
