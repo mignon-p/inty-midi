@@ -19,11 +19,16 @@ type AbsTime = Word64
 type Channel = Word8
 type NoteValue = Int16
 type AbsMidiMessage = (AbsTime, MidiEvent)
+
+data NoteType = On | Off | Sustain deriving (Eq, Ord, Show)
+
 data Note = Note
   { nTime :: !AbsTime
   , nChan :: !Channel
   , nVal  :: !NoteValue
+  , nType :: !NoteType
   } deriving (Eq, Ord, Show)
+
 type ChannelSet = Word16
 type ChannelMap = IM.IntMap Channel
 type NoteMap = IM.IntMap String
@@ -77,12 +82,16 @@ mergeNotes [] nvs = nvs
 mergeNotes (note:rest) nvs = mergeNotes rest nvs'
   where nvs' = setElem nvs (fromIntegral $ nChan note) (nVal note)
 
+noteTypeHack :: Note -> Note
+noteTypeHack note@(Note {nType = On}) = note
+noteTypeHack note = note { nVal = (-1) }
+
 convertNotes :: AbsTime -> [Note] -> ChannelSet -> [[NoteValue]]
 convertNotes _ [] _ = []
 convertNotes now notes playing =
   let (current, future) = partition isCurrent notes
       isCurrent note = nTime note == now
-      nvs = mergeNotes current (nvsFromPlaying playing)
+      nvs = mergeNotes (map noteTypeHack current) (nvsFromPlaying playing)
       playing' = playingFromNvs nvs
   in nvs : convertNotes (now + 1) future playing'
 
@@ -123,10 +132,10 @@ findDivisor notes =
 getNotes :: [AbsMidiMessage] -> [Note]
 getNotes [] = []
 getNotes ((t, VoiceEvent _ (NoteOn ch note vel)):rest) =
-  let note' = if vel == 0 then (-1) else fromIntegral note
-  in Note t ch note' : getNotes rest
-getNotes ((t, VoiceEvent _ (NoteOff ch _ _)):rest) =
-  Note t ch (-1) : getNotes rest
+  let typ = if vel == 0 then Off else On
+  in Note t ch (fromIntegral note) typ : getNotes rest
+getNotes ((t, VoiceEvent _ (NoteOff ch note _)):rest) =
+  Note t ch (fromIntegral note) Off : getNotes rest
 getNotes (_:rest) = getNotes rest
 
 {-
