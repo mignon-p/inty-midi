@@ -7,6 +7,7 @@ import Data.Int
 import qualified Data.IntMap.Strict as IM
 import Data.List
 import qualified Data.Map.Strict as M
+import Data.Maybe
 import Data.Ord
 import Data.Word
 import System.Environment
@@ -34,6 +35,13 @@ type ChannelSet = Word16
 type ChannelMap = IM.IntMap Channel
 type NoteMap = IM.IntMap String
 type CurrentNoteMap = M.Map (Channel, NoteValue) Channel
+
+data Metadata = Metadata
+  { mTPB :: Maybe Word16
+  , mTempo :: Maybe Word32
+  , mTimeSig :: Maybe (Word8, Word8, Word8, Word8)
+  , mSeqName :: Maybe String
+  } deriving (Eq, Ord, Show)
 
 indent :: String
 indent = "    "
@@ -195,6 +203,23 @@ getMetaLines ((_, MetaEvent (TextEvent typ str)):rest) =
   where trm = dropWhileEnd isSpace
 getMetaLines (_:rest) = getMetaLines rest
 -}
+
+handleMetaEvent :: Metadata -> MidiMetaEvent -> Metadata
+handleMetaEvent md (TextEvent SEQUENCE_NAME name) =
+  md { mSeqName = Just $ fromMaybe name (mSeqName md) }
+handleMetaEvent md (SetTempo tempo) =
+  md { mTempo = Just $ fromMaybe tempo (mTempo md) }
+handleMetaEvent md (TimeSignature w x y z) =
+  md { mTimeSig = Just $ fromMaybe (w, x, y, z) (mTimeSig md) }
+
+extractMetadata' :: Metadata -> [AbsMidiMessage] -> Metadata
+extractMetadata' md ((_, MetaEvent mev):rest) =
+  extractMetadata' (handleMetaEvent md mev) rest
+extractMetadata' md (_:rest) = extractMetadata' md rest
+extractMetadata' md _ = md
+
+extractMetadata :: [AbsMidiMessage] -> Metadata
+extractMetadata = extractMetadata' $ Metadata Nothing Nothing Nothing Nothing
 
 getMusicLines :: [AbsMidiMessage] -> Either ErrMsg [String]
 getMusicLines msgs =
