@@ -6,6 +6,7 @@ import Data.Containers.ListUtils
 import Data.Int
 import qualified Data.IntMap.Strict as IM
 import Data.List
+import qualified Data.Map.Strict as M
 import Data.Ord
 import Data.Word
 import System.Environment
@@ -20,7 +21,7 @@ type Channel = Word8
 type NoteValue = Int16
 type AbsMidiMessage = (AbsTime, MidiEvent)
 
-data NoteType = On | Off | Sustain deriving (Eq, Ord, Show)
+data NoteType = Off | On deriving (Eq, Ord, Show)
 
 data Note = Note
   { nTime :: !AbsTime
@@ -32,6 +33,7 @@ data Note = Note
 type ChannelSet = Word16
 type ChannelMap = IM.IntMap Channel
 type NoteMap = IM.IntMap String
+type CurrentNoteMap = M.Map (Channel, NoteValue) Channel
 
 indent :: String
 indent = "    "
@@ -119,6 +121,48 @@ mapChannels cm (note:rest) =
   case IM.lookup (fromIntegral $ nChan note) cm of
     Just ch -> note { nChan = ch } : mapChannels cm rest
     _ -> mapChannels cm rest
+
+findUnusedVoice :: ChannelSet -> Channel
+findUnusedVoice cs = fu 0
+  where fu 15 = 15
+        fu n = if testBit cs (fromIntegral n)
+               then fu (n + 1)
+               else n
+
+remapNote :: ChannelSet
+          -> CurrentNoteMap
+          -> Note
+          -> (ChannelSet, CurrentNoteMap, Channel, Bool)
+remapNote usedVoices currentNotes note@(Note { nType = On }) =
+  let newChan = findUnusedVoice usedVoices
+      usedVoices' = setBit usedVoices (fromIntegral newChan)
+      currentNotes' = M.insert key newChan currentNotes
+      key = (nChan note, nVal note)
+  in (usedVoices', currentNotes', newChan, True)
+remapNote usedVoices currentNotes note =  -- nType = Off
+  let key = (nChan note, nVal note)
+  in case M.lookup key currentNotes of
+    Just newChan ->
+      let usedVoices' = clearBit usedVoices (fromIntegral newChan)
+          currentNotes' = M.delete key currentNotes
+      in (usedVoices', currentNotes', newChan, True)
+    _ -> (usedVoices, currentNotes, 0, False)
+
+remapChannels' :: ChannelSet
+               -> CurrentNoteMap
+               -> [Note]
+               -> [Note]
+remapChannels' _ _ [] = []
+remapChannels' usedVoices currentNotes (n:ns) =
+  if ok
+  then n' : remapChannels' usedVoices' currentNotes' ns
+  else remapChannels' usedVoices' currentNotes' ns -- unpaired note off
+  where n' = n { nChan = newChannel }
+        (usedVoices', currentNotes', newChannel, ok) =
+          remapNote usedVoices currentNotes n
+
+remapChannels :: [Note] -> [Note]
+remapChannels = remapChannels' 0 M.empty
 
 divTime :: AbsTime -> [Note] -> [Note]
 divTime divisor = map dt
