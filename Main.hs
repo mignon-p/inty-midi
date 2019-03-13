@@ -39,7 +39,7 @@ indent :: String
 indent = "    "
 
 maxChannels :: Channel
-maxChannels = 3
+maxChannels = 6
 
 noteNames :: [String]
 noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -61,8 +61,13 @@ noteMap = IM.fromList $ (-2, "S") : noteList
 formatNote :: NoteValue -> String
 formatNote nv = IM.findWithDefault "-" (fromIntegral nv) noteMap
 
+nodrums :: [String] -> [String]
+nodrums (a:b:c:rest) = a : b : c : "-" : rest
+nodrums x = x
+
 formatLine :: [NoteValue] -> String
-formatLine nvs = indent ++ "MUSIC " ++ intercalate "," (map formatNote nvs)
+formatLine nvs =
+  indent ++ "MUSIC " ++ intercalate "," (nodrums (map formatNote nvs))
 
 nvsFromPlaying :: ChannelSet -> [NoteValue]
 nvsFromPlaying cs = map f [0 .. fromIntegral maxChannels - 1]
@@ -193,7 +198,7 @@ getMetaLines (_:rest) = getMetaLines rest
 
 getMusicLines :: [AbsMidiMessage] -> Either ErrMsg [String]
 getMusicLines msgs =
-  let notes = nubOrd $ getNotes msgs
+  let notes = remapChannels $ nubOrd $ getNotes msgs
       notes' = mapChannels (makeChannelMap (channelsUsed notes)) notes
       divisor = findDivisor notes'
       notes'' = divTime divisor notes'
