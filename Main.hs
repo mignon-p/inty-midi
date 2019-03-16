@@ -197,23 +197,20 @@ getNotes ((t, VoiceEvent _ (NoteOff ch note _)):rest) =
 getNotes (_:rest) = getNotes rest
 
 computeTempo' :: Double -> Double -> Double -> Double
-computeTempo' microsPerQuarter thirtysecondsPer24Clocks divisor =
-  let quartersPer24Clocks = thirtysecondsPer24Clocks / 8
-      quartersPerClock = quartersPer24Clocks / 24
-      microsPerClock = microsPerQuarter * quartersPerClock
-      secondsPerClock = microsPerClock / 1e6
-      secondsPerLine = secondsPerClock * divisor
+computeTempo' microsPerQuarter ticksPerQuarter ticksPerLine =
+  let microsPerTick = microsPerQuarter / ticksPerQuarter
+      secondsPerTick = microsPerTick / 1e6
+      secondsPerLine = secondsPerTick * ticksPerLine
       intyUnitsPerLine = secondsPerLine * 50
   in intyUnitsPerLine
 
 computeTempo :: Metadata -> AbsTime -> Int
 computeTempo meta divisor =
-  let tpb = case mTimeDivision meta of
+  let tpq = case mTimeDivision meta of
               TPB x -> x
               _ -> 384
-      tempo = fromMaybe 500000 (mTempo meta)
-      (nn, dd, cc, bb) = fromMaybe (4, 4, fromIntegral tpb, 8) (mTimeSig meta)
-  in round $ computeTempo' (fromIntegral tempo) (fromIntegral bb) (fromIntegral divisor)
+      uspq = fromMaybe 500000 (mTempo meta)
+  in round $ computeTempo' (fromIntegral uspq) (fromIntegral tpq) (fromIntegral divisor)
 
 handleMetaEvent :: Metadata -> MidiMetaEvent -> Metadata
 handleMetaEvent md (TextEvent SEQUENCE_NAME name) =
