@@ -37,11 +37,12 @@ type NoteMap = IM.IntMap String
 type CurrentNoteMap = M.Map (Channel, NoteValue) Channel
 
 data Metadata = Metadata
-  { mTPB :: Maybe Word16
+  { mFilename :: String
+  , mTimeDivision :: MidiTimeDivision
   , mTempo :: Maybe Word32
   , mTimeSig :: Maybe (Word8, Word8, Word8, Word8)
   , mSeqName :: Maybe String
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Show)
 
 indent :: String
 indent = "    "
@@ -195,14 +196,24 @@ getNotes ((t, VoiceEvent _ (NoteOff ch note _)):rest) =
   Note t ch (fromIntegral note) Off : getNotes rest
 getNotes (_:rest) = getNotes rest
 
-{-
-getMetaLines :: [AbsMidiMessage] -> [String]
-getMetaLines [] = []
-getMetaLines ((_, MetaEvent (TextEvent typ str)):rest) =
-  trm (indent ++ "' " ++ show typ ++ ": " ++ str) : getMetaLines rest
-  where trm = dropWhileEnd isSpace
-getMetaLines (_:rest) = getMetaLines rest
--}
+computeTempo' :: Double -> Double -> Double -> Double
+computeTempo' microsPerQuarter thirtysecondsPer24Clocks divisor =
+  let quartersPer24Clocks = thirtysecondsPer24Clocks / 8
+      quartersPerClock = quartersPer24Clocks / 24
+      microsPerClock = microsPerQuarter * quartersPerClock
+      secondsPerClock = microsPerClock / 1e6
+      secondsPerLine = secondsPerClock * divisor
+      intyUnitsPerLine = secondsPerLine * 50
+  in intyUnitsPerLine
+
+computeTempo :: Metadata -> AbsTime -> Int
+computeTempo meta divisor =
+  let tpb = case mTimeDivision meta of
+              TPB x -> x
+              _ -> 384
+      tempo = fromMaybe 500000 (mTempo meta)
+      (nn, dd, cc, bb) = fromMaybe (4, 4, fromIntegral tpb, 8) (mTimeSig meta)
+  in round $ computeTempo' (fromIntegral tempo) (fromIntegral bb) (fromIntegral divisor)
 
 handleMetaEvent :: Metadata -> MidiMetaEvent -> Metadata
 handleMetaEvent md (TextEvent SEQUENCE_NAME name) =
@@ -211,6 +222,7 @@ handleMetaEvent md (SetTempo tempo) =
   md { mTempo = Just $ fromMaybe tempo (mTempo md) }
 handleMetaEvent md (TimeSignature w x y z) =
   md { mTimeSig = Just $ fromMaybe (w, x, y, z) (mTimeSig md) }
+handleMetaEvent md _ = md
 
 extractMetadata' :: Metadata -> [AbsMidiMessage] -> Metadata
 extractMetadata' md ((_, MetaEvent mev):rest) =
@@ -218,17 +230,20 @@ extractMetadata' md ((_, MetaEvent mev):rest) =
 extractMetadata' md (_:rest) = extractMetadata' md rest
 extractMetadata' md _ = md
 
-extractMetadata :: [AbsMidiMessage] -> Metadata
-extractMetadata = extractMetadata' $ Metadata Nothing Nothing Nothing Nothing
+extractMetadata :: FilePath -> MidiTimeDivision -> [AbsMidiMessage] -> Metadata
+extractMetadata filename timeDiv =
+  extractMetadata' $ Metadata filename timeDiv Nothing Nothing Nothing
 
-getMusicLines :: [AbsMidiMessage] -> Either ErrMsg [String]
-getMusicLines msgs =
+getMusicLines :: Metadata -> [AbsMidiMessage] -> Either ErrMsg [String]
+getMusicLines meta msgs =
   let notes = remapChannels $ nubOrd $ getNotes msgs
       notes' = mapChannels (makeChannelMap (channelsUsed notes)) notes
       divisor = findDivisor notes'
       notes'' = divTime divisor notes'
       intyNotes = convertNotes 0 notes'' 0
-  in Right $ map formatLine intyNotes
+      intyTempo = computeTempo meta divisor
+      tempoLine = indent ++ "DATA " ++ show intyTempo
+  in Right $ tempoLine : map formatLine intyNotes
 
 absolutify :: AbsTime -> [MidiMessage] -> [AbsMidiMessage]
 absolutify _ [] = []
@@ -240,22 +255,11 @@ combineTracks :: [MidiTrack] -> [AbsMidiMessage]
 combineTracks =
   sortBy (comparing fst) . concatMap (absolutify 0 . getTrackMessages)
 
-{-
-hasOnlyMetadata :: MidiTrack -> Bool
-hasOnlyMetadata trk = onlyMeta $ getTrackMessages trk
-  where onlyMeta [] = True
-        onlyMeta ((_, MetaEvent {}):rest) = onlyMeta rest
-        onlyMeta _ = False
--}
-
-convert' :: Word16 -> [MidiTrack] -> Either ErrMsg [String]
-convert' tpb trks = getMusicLines $ combineTracks trks
-
-convert :: MidiFile -> Either ErrMsg [String]
-convert (MidiFile hdr trks) =
-  case time_division hdr of
-    TPB tpb -> convert' tpb trks
-    _ -> convert' 384 trks
+convert :: FilePath -> MidiFile -> Either ErrMsg [String]
+convert filename (MidiFile hdr trks) =
+  let combined = combineTracks trks
+      meta = extractMetadata filename (time_division hdr) combined
+  in getMusicLines meta combined
 
 main' :: FilePath -> IO ()
 main' filename = do
@@ -265,7 +269,7 @@ main' filename = do
       hPutStrLn stderr $ "error parsing " ++ filename ++ ": " ++ msg
       exitFailure
     Right midifile -> do
-      let eth' = convert $ canonical midifile
+      let eth' = convert filename $ canonical midifile
       case eth' of
         Left msg -> do
           hPutStrLn stderr $ "error in " ++ filename ++ ": " ++ msg
