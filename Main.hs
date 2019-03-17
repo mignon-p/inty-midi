@@ -93,8 +93,10 @@ playingFromNvs (nv:nvs) = f nv .|. (playingFromNvs nvs `shiftL` 1)
 
 setElem :: [a] -> Int -> a -> [a]
 setElem xs idx x =
-  let (before, (_:after)) = splitAt idx xs
-  in before ++ x : after
+  if idx < fromIntegral maxChannels
+  then let (before, (_:after)) = splitAt idx xs
+       in before ++ x : after
+  else xs
 
 mergeNotes :: [Note] -> [NoteValue] -> [NoteValue]
 mergeNotes [] nvs = nvs
@@ -113,35 +115,6 @@ convertNotes now notes playing =
       nvs = mergeNotes (map noteTypeHack current) (nvsFromPlaying playing)
       playing' = playingFromNvs nvs
   in nvs : convertNotes (now + 1) future playing'
-
-{-
-
-channelsUsed :: [Note] -> ChannelSet
-channelsUsed = foldr addCh 0
-  where addCh note acc = acc .|. bit (fromIntegral (nChan note))
-
-channelList :: ChannelSet -> [Channel]
-channelList cs = chkChan 0
-  where chkChan 16 = []
-        chkChan x =
-          if testBit cs (fromIntegral x)
-          then x : chkChan (x + 1)
-          else chkChan (x + 1)
-
-makeChannelMap :: ChannelSet -> ChannelMap
-makeChannelMap cs =
-  let clist = map fromIntegral $ channelList cs
-      cmap = zip clist [0..maxChannels-1]
-  in IM.fromList cmap
-
-mapChannels :: ChannelMap -> [Note] -> [Note]
-mapChannels _ [] = []
-mapChannels cm (note:rest) =
-  case IM.lookup (fromIntegral $ nChan note) cm of
-    Just ch -> note { nChan = ch } : mapChannels cm rest
-    _ -> mapChannels cm rest
-
--}
 
 findUnusedVoice :: ChannelSet -> Channel
 findUnusedVoice cs = fu 0
