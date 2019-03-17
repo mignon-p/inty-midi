@@ -44,6 +44,10 @@ data Metadata = Metadata
   , mSeqName :: Maybe String
   } deriving (Eq, Show)
 
+data TheOptions = TheOptions
+  { oMain :: Bool
+  } deriving (Eq, Show)
+
 indent :: String
 indent = "    "
 
@@ -254,8 +258,10 @@ labelFromTitle :: String -> String
 labelFromTitle = map f
   where f x = if isAlphaNum x then x else '_'
 
-getMusicLines :: Metadata -> [AbsMidiMessage] -> Either ErrMsg [String]
-getMusicLines meta msgs =
+mainProgram = undefined
+
+getMusicLines :: TheOptions -> Metadata -> [AbsMidiMessage] -> Either ErrMsg [String]
+getMusicLines opts meta msgs =
   let notes = remapChannels $ nubOrd $ getNotes msgs
       notes' = mapChannels (makeChannelMap (channelsUsed notes)) notes
       divisor = findDivisor notes'
@@ -263,10 +269,14 @@ getMusicLines meta msgs =
       intyNotes = convertNotes 0 notes'' 0
       (intyTempo, linesPerMeasure) = computeTempo meta divisor
       title = determineTitle meta
-      labelLine = labelFromTitle title ++ ":"
+      label = labelFromTitle title
+      labelLine = label ++ ":"
       tempoLine = indent ++ "DATA " ++ show intyTempo
       endLine = indent ++ "MUSIC STOP"
-  in Right $ labelLine : tempoLine : "" : insertBlankLines linesPerMeasure (map formatLine intyNotes) ++ [endLine]
+      mainLines = if (oMain opts)
+                  then mainProgram title label
+                  else []
+  in Right $ mainLines ++ labelLine : tempoLine : "" : insertBlankLines linesPerMeasure (map formatLine intyNotes) ++ [endLine]
 
 absolutify :: AbsTime -> [MidiMessage] -> [AbsMidiMessage]
 absolutify _ [] = []
@@ -278,32 +288,38 @@ combineTracks :: [MidiTrack] -> [AbsMidiMessage]
 combineTracks =
   sortBy (comparing fst) . concatMap (absolutify 0 . getTrackMessages)
 
-convert :: FilePath -> MidiFile -> Either ErrMsg [String]
-convert filename (MidiFile hdr trks) =
+convert :: TheOptions -> FilePath -> MidiFile -> Either ErrMsg [String]
+convert opts filename (MidiFile hdr trks) =
   let combined = combineTracks trks
       meta = extractMetadata filename (time_division hdr) combined
-  in getMusicLines meta combined
+  in getMusicLines opts meta combined
 
-main' :: FilePath -> IO ()
-main' filename = do
-  eth <- readMidi filename
+main' :: TheOptions -> FilePath -> FilePath -> IO ()
+main' opts infile outfile = do
+  eth <- readMidi infile
   case eth of
     Left (ParseErr _ msg) -> do
-      hPutStrLn stderr $ "error parsing " ++ filename ++ ": " ++ msg
+      hPutStrLn stderr $ "error parsing " ++ infile ++ ": " ++ msg
       exitFailure
     Right midifile -> do
-      let eth' = convert filename $ canonical midifile
+      let eth' = convert opts infile $ canonical midifile
       case eth' of
         Left msg -> do
-          hPutStrLn stderr $ "error in " ++ filename ++ ": " ++ msg
+          hPutStrLn stderr $ "error in " ++ infile ++ ": " ++ msg
           exitFailure
-        Right lns -> putStr $ unlines lns
+        Right lns -> writeFile outfile $ unlines lns
+
+extractOptions :: [String] -> (TheOptions, [String])
+extractOptions ("-m" : args) = (TheOptions True, args)
+extractOptions args = (TheOptions False, args)
 
 main :: IO ()
 main = do
   args <- getArgs
-  case args of
-    [filename] -> main' filename
+  let (opts, args') = extractOptions args
+  case args' of
+    [infile, outfile] -> main' opts infile outfile
     _ -> do
-      hPutStrLn stderr "Usage: inty-midi file.mid"
+      hPutStrLn stderr "Usage: inty-midi [-m] input.mid output.bas"
+      hPutStrLn stderr "    -m  include a main program in output"
       exitFailure
