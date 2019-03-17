@@ -265,9 +265,17 @@ absolutify now ((delta, ev):rest) =
   let next = now + fromIntegral delta
   in (next, ev) : absolutify next rest
 
+-- sort primarily by absolute time, but for message of equal time,
+-- put NoteOn messages after the NoteOff messages, because NoteOff
+-- may free up voices that can be used by NoteOn
+absSortKey :: AbsMidiMessage -> (AbsTime, Bool)
+absSortKey (t, (VoiceEvent _ (NoteOn _ _ 0))) = (t, False)
+absSortKey (t, (VoiceEvent _ (NoteOff _ _ _))) = (t, False)
+absSortKey (t, _) = (t, True)
+
 combineTracks :: [MidiTrack] -> [AbsMidiMessage]
 combineTracks =
-  sortBy (comparing fst) . concatMap (absolutify 0 . getTrackMessages)
+  sortBy (comparing absSortKey) . concatMap (absolutify 0 . getTrackMessages)
 
 convert :: TheOptions -> FilePath -> MidiFile -> Either ErrMsg [String]
 convert opts filename (MidiFile hdr trks) =
