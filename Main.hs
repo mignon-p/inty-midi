@@ -62,10 +62,15 @@ namesForOctave octave = map insertOct noteNames
         insertOct (letter:accidental) = letter : octStr ++ accidental
 
 allNoteNames :: [String]
-allNoteNames = concatMap namesForOctave [2..7]
+allNoteNames = concatMap namesForOctave [-1..9]
 
 noteList :: [(Int, String)]
-noteList = zip [36..96] allNoteNames
+noteList = zip [0..127] allNoteNames
+
+-- range of MIDI notes supported by IntyBASIC
+lowestNote, highestNote :: NoteValue
+lowestNote = 36
+highestNote = 96
 
 noteMap :: NoteMap
 noteMap = IM.fromList $ (-2, "S") : noteList
@@ -132,7 +137,10 @@ remapNote usedVoices currentNotes note@(Note { nType = On }) =
       usedVoices' = setBit usedVoices (fromIntegral newChan)
       currentNotes' = M.insert key newChan currentNotes
       key = (nChan note, nVal note)
-  in (usedVoices', currentNotes', newChan, True)
+      inRange = nVal note >= lowestNote && nVal note <= highestNote
+  in if inRange
+     then (usedVoices', currentNotes', newChan, True)
+     else (usedVoices, currentNotes, 0, False) -- note out of range
 remapNote usedVoices currentNotes note =  -- nType = Off
   let key = (nChan note, nVal note)
   in case M.lookup key currentNotes of
@@ -140,7 +148,7 @@ remapNote usedVoices currentNotes note =  -- nType = Off
       let usedVoices' = clearBit usedVoices (fromIntegral newChan)
           currentNotes' = M.delete key currentNotes
       in (usedVoices', currentNotes', newChan, True)
-    _ -> (usedVoices, currentNotes, 0, False)
+    _ -> (usedVoices, currentNotes, 0, False) -- unpaired note off
 
 remapChannels' :: ChannelSet
                -> CurrentNoteMap
@@ -150,7 +158,7 @@ remapChannels' _ _ [] = []
 remapChannels' usedVoices currentNotes (n:ns) =
   if ok
   then n' : remapChannels' usedVoices' currentNotes' ns
-  else remapChannels' usedVoices' currentNotes' ns -- unpaired note off
+  else remapChannels' usedVoices' currentNotes' ns
   where n' = n { nChan = newChannel }
         (usedVoices', currentNotes', newChannel, ok) =
           remapNote usedVoices currentNotes n
