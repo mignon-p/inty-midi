@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Ord
 import Data.Word
+import Debug.Trace
 import System.Environment
 import System.Exit
 import System.IO
@@ -196,21 +197,27 @@ getNotes ((t, VoiceEvent _ (NoteOff ch note _)):rest) =
   Note t ch (fromIntegral note) Off : getNotes rest
 getNotes (_:rest) = getNotes rest
 
-computeTempo' :: Double -> Double -> Double -> Double
-computeTempo' microsPerQuarter ticksPerQuarter ticksPerLine =
+computeTempo' :: Double -> Double -> Double -> Double -> Double -> (Double, Double)
+computeTempo' microsPerQuarter ticksPerQuarter ticksPerLine beatsPerMeasure beatsPerWholeNote =
   let microsPerTick = microsPerQuarter / ticksPerQuarter
       secondsPerTick = microsPerTick / 1e6
       secondsPerLine = secondsPerTick * ticksPerLine
       intyUnitsPerLine = secondsPerLine * 50
-  in intyUnitsPerLine
+      beatsPerQuarter = beatsPerWholeNote / 4
+      linesPerQuarter = ticksPerQuarter / ticksPerLine
+      beatsPerLine = beatsPerQuarter / linesPerQuarter
+      linesPerMeasure = beatsPerMeasure / beatsPerLine
+  in {- traceShow (microsPerQuarter, ticksPerQuarter, ticksPerLine, beatsPerMeasure, beatsPerWholeNote) -} (intyUnitsPerLine, linesPerMeasure)
 
-computeTempo :: Metadata -> AbsTime -> Int
+computeTempo :: Metadata -> AbsTime -> (Int, Int)
 computeTempo meta divisor =
   let tpq = case mTimeDivision meta of
               TPB x -> x
               _ -> 384
       uspq = fromMaybe 500000 (mTempo meta)
-  in round $ computeTempo' (fromIntegral uspq) (fromIntegral tpq) (fromIntegral divisor)
+      (num, denom, _, _) = fromMaybe (4, 2, 0, 0) (mTimeSig meta)
+      (intyTempo, linesPerMeasure) = computeTempo' (fromIntegral uspq) (fromIntegral tpq) (fromIntegral divisor) (fromIntegral num) (fromIntegral $ 2 ^ denom)
+  in (round intyTempo, round linesPerMeasure)
 
 handleMetaEvent :: Metadata -> MidiMetaEvent -> Metadata
 handleMetaEvent md (TextEvent SEQUENCE_NAME name) =
@@ -231,6 +238,12 @@ extractMetadata :: FilePath -> MidiTimeDivision -> [AbsMidiMessage] -> Metadata
 extractMetadata filename timeDiv =
   extractMetadata' $ Metadata filename timeDiv Nothing Nothing Nothing
 
+insertBlankLines :: Int -> [String] -> [String]
+insertBlankLines _ [] = []
+insertBlankLines lpm lns =
+  let (x, y) = splitAt lpm lns
+  in x ++ [""] ++ insertBlankLines lpm y
+
 getMusicLines :: Metadata -> [AbsMidiMessage] -> Either ErrMsg [String]
 getMusicLines meta msgs =
   let notes = remapChannels $ nubOrd $ getNotes msgs
@@ -238,9 +251,9 @@ getMusicLines meta msgs =
       divisor = findDivisor notes'
       notes'' = divTime divisor notes'
       intyNotes = convertNotes 0 notes'' 0
-      intyTempo = computeTempo meta divisor
+      (intyTempo, linesPerMeasure) = computeTempo meta divisor
       tempoLine = indent ++ "DATA " ++ show intyTempo
-  in Right $ tempoLine : map formatLine intyNotes
+  in Right $ tempoLine : insertBlankLines linesPerMeasure (map formatLine intyNotes)
 
 absolutify :: AbsTime -> [MidiMessage] -> [AbsMidiMessage]
 absolutify _ [] = []
