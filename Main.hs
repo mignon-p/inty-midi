@@ -10,7 +10,6 @@ import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Ord
 import Data.Word
-import Debug.Trace
 import System.Environment
 import System.Exit
 import System.IO
@@ -207,7 +206,7 @@ computeTempo' microsPerQuarter ticksPerQuarter ticksPerLine beatsPerMeasure beat
       linesPerQuarter = ticksPerQuarter / ticksPerLine
       beatsPerLine = beatsPerQuarter / linesPerQuarter
       linesPerMeasure = beatsPerMeasure / beatsPerLine
-  in {- traceShow (microsPerQuarter, ticksPerQuarter, ticksPerLine, beatsPerMeasure, beatsPerWholeNote) -} (intyUnitsPerLine, linesPerMeasure)
+  in (intyUnitsPerLine, linesPerMeasure)
 
 computeTempo :: Metadata -> AbsTime -> (Int, Int)
 computeTempo meta divisor =
@@ -244,6 +243,17 @@ insertBlankLines lpm lns =
   let (x, y) = splitAt lpm lns
   in x ++ [""] ++ insertBlankLines lpm y
 
+determineTitle :: Metadata -> String
+determineTitle meta = fromMaybe base (mSeqName meta)
+  where base = reverse $ takeWhile notSlash $ reverse $ mFilename meta
+        notSlash '/' = False
+        notSlash '\\' = False
+        notSlash _ = True
+
+labelFromTitle :: String -> String
+labelFromTitle = map f
+  where f x = if isAlphaNum x then x else '_'
+
 getMusicLines :: Metadata -> [AbsMidiMessage] -> Either ErrMsg [String]
 getMusicLines meta msgs =
   let notes = remapChannels $ nubOrd $ getNotes msgs
@@ -252,8 +262,11 @@ getMusicLines meta msgs =
       notes'' = divTime divisor notes'
       intyNotes = convertNotes 0 notes'' 0
       (intyTempo, linesPerMeasure) = computeTempo meta divisor
+      title = determineTitle meta
+      labelLine = labelFromTitle title ++ ":"
       tempoLine = indent ++ "DATA " ++ show intyTempo
-  in Right $ tempoLine : insertBlankLines linesPerMeasure (map formatLine intyNotes)
+      endLine = indent ++ "MUSIC STOP"
+  in Right $ labelLine : tempoLine : "" : insertBlankLines linesPerMeasure (map formatLine intyNotes) ++ [endLine]
 
 absolutify :: AbsTime -> [MidiMessage] -> [AbsMidiMessage]
 absolutify _ [] = []
