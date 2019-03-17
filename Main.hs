@@ -114,6 +114,8 @@ convertNotes now notes playing =
       playing' = playingFromNvs nvs
   in nvs : convertNotes (now + 1) future playing'
 
+{-
+
 channelsUsed :: [Note] -> ChannelSet
 channelsUsed = foldr addCh 0
   where addCh note acc = acc .|. bit (fromIntegral (nChan note))
@@ -138,6 +140,8 @@ mapChannels cm (note:rest) =
   case IM.lookup (fromIntegral $ nChan note) cm of
     Just ch -> note { nChan = ch } : mapChannels cm rest
     _ -> mapChannels cm rest
+
+-}
 
 findUnusedVoice :: ChannelSet -> Channel
 findUnusedVoice cs = fu 0
@@ -260,10 +264,9 @@ labelFromTitle = map f
 getMusicLines :: TheOptions -> Metadata -> [AbsMidiMessage] -> Either ErrMsg [String]
 getMusicLines opts meta msgs =
   let notes = remapChannels $ nubOrd $ getNotes msgs
-      notes' = mapChannels (makeChannelMap (channelsUsed notes)) notes
-      divisor = findDivisor notes'
-      notes'' = divTime divisor notes'
-      intyNotes = convertNotes 0 notes'' 0
+      divisor = findDivisor notes
+      notes' = divTime divisor notes
+      intyNotes = convertNotes 0 notes' 0
       (intyTempo, linesPerMeasure) = computeTempo meta divisor
       title = determineTitle meta
       label = labelFromTitle title
