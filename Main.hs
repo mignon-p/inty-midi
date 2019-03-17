@@ -201,11 +201,13 @@ computeTempo' microsPerQuarter ticksPerQuarter ticksPerLine beatsPerMeasure beat
       linesPerMeasure = beatsPerMeasure / beatsPerLine
   in (intyUnitsPerLine, linesPerMeasure)
 
+getTicksPerQuarter :: MidiTimeDivision -> Word16
+getTicksPerQuarter (TPB x) = x
+getTicksPerQuarter _ = 384
+
 computeTempo :: Metadata -> AbsTime -> (Int, Int)
 computeTempo meta divisor =
-  let tpq = case mTimeDivision meta of
-              TPB x -> x
-              _ -> 384
+  let tpq = getTicksPerQuarter $ mTimeDivision meta
       uspq = fromMaybe 500000 (mTempo meta)
       (num, denom, _, _) = fromMaybe (4, 2, 0, 0) (mTimeSig meta)
       (intyTempo, linesPerMeasure) = computeTempo' (fromIntegral uspq) (fromIntegral tpq) (fromIntegral divisor) (fromIntegral num) (fromIntegral $ 2 ^ denom)
@@ -282,11 +284,25 @@ combineTracks :: [MidiTrack] -> [AbsMidiMessage]
 combineTracks =
   sortBy (comparing absSortKey) . concatMap (absolutify 0 . getTrackMessages)
 
+quantize' :: AbsTime -> [AbsMidiMessage] -> [AbsMidiMessage]
+quantize' quantum = map f
+  where quantum' = fromIntegral quantum :: Double
+        f (t, ev) = (quantum * round (fromIntegral t / quantum'), ev)
+
+quantize :: TheOptions -> Metadata -> [AbsMidiMessage] -> [AbsMidiMessage]
+quantize opts@(TheOptions { oQuantize = q }) meta msgs
+  | q <= 0 = msgs
+  | otherwise =
+    let tpq = fromIntegral $ getTicksPerQuarter $ mTimeDivision meta
+        ticksPerWhole = tpq * 4
+        quantum = ticksPerWhole `div` fromIntegral q
+    in quantize' quantum msgs
+
 convert :: TheOptions -> FilePath -> MidiFile -> Either ErrMsg [String]
 convert opts filename (MidiFile hdr trks) =
   let combined = combineTracks trks
       meta = extractMetadata filename (time_division hdr) combined
-  in getMusicLines opts meta combined
+  in getMusicLines opts meta (quantize opts meta combined)
 
 main' :: TheOptions -> FilePath -> FilePath -> IO ()
 main' opts infile outfile = do
