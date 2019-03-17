@@ -17,6 +17,8 @@ import ZMidi.Core.Canonical
 import ZMidi.Core.Datatypes
 import ZMidi.Core.ReadFile
 
+import PreviewProgram
+
 type AbsTime = Word64
 type Channel = Word8
 type NoteValue = Int16
@@ -47,9 +49,6 @@ data Metadata = Metadata
 data TheOptions = TheOptions
   { oMain :: Bool
   } deriving (Eq, Show)
-
-indent :: String
-indent = "    "
 
 maxChannels :: Channel
 maxChannels = 6
@@ -257,8 +256,6 @@ determineTitle meta = fromMaybe base (mSeqName meta)
 labelFromTitle :: String -> String
 labelFromTitle = map f
   where f x = if isAlphaNum x then x else '_'
-
-mainProgram = undefined
 
 getMusicLines :: TheOptions -> Metadata -> [AbsMidiMessage] -> Either ErrMsg [String]
 getMusicLines opts meta msgs =
