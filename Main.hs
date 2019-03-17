@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Monad
 import Data.Bits
 import Data.Char
 import Data.Containers.ListUtils
@@ -13,6 +14,7 @@ import Data.Word
 import System.Environment
 import System.Exit
 import System.IO
+import Text.Read
 import ZMidi.Core.Canonical
 import ZMidi.Core.Datatypes
 import ZMidi.Core.ReadFile
@@ -48,6 +50,9 @@ data Metadata = Metadata
 
 data TheOptions = TheOptions
   { oMain :: Bool
+  , oQuantize :: Int -- quantize to 1/oQuantize notes (e. g. 16 for 16th notes)
+  , oArgs :: [String] -- non-option arguments
+  , oErrors :: [String]
   } deriving (Eq, Show)
 
 maxChannels :: Channel
@@ -298,17 +303,35 @@ main' opts infile outfile = do
           exitFailure
         Right lns -> writeFile outfile $ unlines lns
 
-extractOptions :: [String] -> (TheOptions, [String])
-extractOptions ("-m" : args) = (TheOptions True, args)
-extractOptions args = (TheOptions False, args)
+extractOptions :: [String] -> TheOptions
+extractOptions [] = TheOptions { oMain = False
+                               , oQuantize = 0
+                               , oArgs = []
+                               , oErrors = []
+                               }
+extractOptions ("-m" : args) = (extractOptions args) { oMain = True }
+extractOptions ("-q" : n : args) =
+  case readMaybe n of
+    Just n' -> (extractOptions args) { oQuantize = n' }
+    _ -> let args' = extractOptions args
+         in args' { oErrors = "Argument to -q must be an integer" : oErrors args' }
+extractOptions (bad@('-':_):args) =
+  let args' = extractOptions args
+  in args' { oErrors = ("Unrecognized option " ++ bad) : oErrors args' }
+extractOptions (arg:args) =
+  let args' = extractOptions args
+  in args' { oArgs = arg : oArgs args' }
 
 main :: IO ()
 main = do
   args <- getArgs
-  let (opts, args') = extractOptions args
-  case args' of
-    [infile, outfile] -> main' opts infile outfile
-    _ -> do
-      hPutStrLn stderr "Usage: inty-midi [-m] input.mid output.bas"
-      hPutStrLn stderr "    -m  include a main program in output"
+  let opts = extractOptions args
+  case (oErrors opts, oArgs opts) of
+    ([], [infile, outfile]) -> main' opts infile outfile
+    (errs, _) -> do
+      let e = hPutStrLn stderr
+      forM_ errs e
+      e "Usage: inty-midi [-m] [-q n] input.mid output.bas"
+      e "    -m    include a main program in output"
+      e "    -q n  quantize to 1/n notes (e. g. 16 for 16th notes)"
       exitFailure
