@@ -91,9 +91,16 @@ formatLine :: [NoteValue] -> String
 formatLine nvs =
   indent ++ "MUSIC " ++ intercalate "," (nodrums (map formatNote nvs))
 
+nvsFromPlaying' :: ChannelSet -> Int -> [NoteValue]
+nvsFromPlaying' 0 _ = []
+nvsFromPlaying' cs b =
+  let cs' = clearBit cs b
+      next = nvsFromPlaying' cs' (b + 1)
+      x = if testBit cs b then (-2) else (-1)
+  in x : next
+
 nvsFromPlaying :: ChannelSet -> [NoteValue]
-nvsFromPlaying cs = map f [0 .. fromIntegral maxChannels - 1]
-  where f n = if testBit cs n then (-2) else (-1)
+nvsFromPlaying cs = nvsFromPlaying' cs 0
 
 playingFromNvs :: [NoteValue] -> ChannelSet
 playingFromNvs [] = 0
@@ -101,12 +108,11 @@ playingFromNvs (nv:nvs) = f nv .|. (playingFromNvs nvs `shiftL` 1)
   where f (-1) = 0
         f _ = 1
 
-setElem :: [a] -> Int -> a -> [a]
+setElem :: [NoteValue] -> Int -> NoteValue -> [NoteValue]
 setElem xs idx x =
-  if idx < fromIntegral maxChannels
-  then let (before, (_:after)) = splitAt idx xs
-       in before ++ x : after
-  else xs
+  case splitAt idx xs of
+    (before, (_:after)) -> before ++ x : after
+    _ -> take idx (xs ++ repeat (-1)) ++ [x]
 
 mergeNotes :: [Note] -> [NoteValue] -> [NoteValue]
 mergeNotes [] nvs = nvs
