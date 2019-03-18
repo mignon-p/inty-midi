@@ -91,6 +91,8 @@ mainProgram title label =
   , ""
   , i "GOTO RESTART"
   , ""
+  , i $ "ASM CFGVAR \"name\" = " ++ show title
+  , ""
   , "ASCII_CHARS:"
   ] ++ asciiCards ++ [""]
   where i = (indent ++)

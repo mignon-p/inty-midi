@@ -238,9 +238,15 @@ insertBlankLines lpm lns =
   let (x, y) = splitAt lpm lns
   in x ++ [""] ++ insertBlankLines lpm y
 
+rmExt :: String -> String
+rmExt s =
+  case dropWhile (/= '.') s of
+    ('.':rest) -> rest
+    _ -> s
+
 determineTitle :: Metadata -> String
 determineTitle meta = fromMaybe base (mSeqName meta)
-  where base = reverse $ takeWhile notSlash $ reverse $ mFilename meta
+  where base = reverse $ rmExt $ takeWhile notSlash $ reverse $ mFilename meta
         notSlash '/' = False
         notSlash '\\' = False
         notSlash _ = True
