@@ -40,6 +40,11 @@ type ChannelMap = IM.IntMap Channel
 type NoteMap = IM.IntMap String
 type CurrentNoteMap = M.Map (Channel, NoteValue) Channel
 
+data NoteLine = NoteLine
+  { lNotes :: [NoteValue]
+  , lDropped :: [NoteValue]
+  } deriving (Eq, Show)
+
 data Metadata = Metadata
   { mFilename :: String
   , mTimeDivision :: MidiTimeDivision
@@ -84,9 +89,14 @@ nodrums :: [String] -> [String]
 nodrums (a:b:c:rest@(_:_)) = a : b : c : "-" : rest
 nodrums x = x
 
-formatLine :: [NoteValue] -> String
-formatLine nvs =
-  indent ++ "MUSIC " ++ intercalate "," (nodrums (map formatNote nvs))
+formatLine :: NoteLine -> String
+formatLine (NoteLine { lNotes = nvs, lDropped = drp }) = stmt ++ comment
+  where
+    stmt = indent ++ "MUSIC " ++ intercalate "," (nodrums (map formatNote nvs))
+    spaces = replicate (max 0 (40 - length stmt)) ' '
+    comment = case drp of
+                [] -> ""
+                xs -> spaces ++ "' dropped " ++ intercalate ", " (map formatNote xs)
 
 nvsFromPlaying' :: ChannelSet -> Int -> [NoteValue]
 nvsFromPlaying' 0 _ = []
@@ -120,27 +130,36 @@ noteTypeHack :: Note -> Note
 noteTypeHack note@(Note {nType = On}) = note
 noteTypeHack note = note { nVal = (-1) }
 
-convertNotes :: AbsTime -> [Note] -> ChannelSet -> [[NoteValue]]
+convertNotes :: AbsTime -> [Note] -> ChannelSet -> [NoteLine]
 convertNotes _ [] _ = []
 convertNotes now notes playing =
   let (current, future) = partition isCurrent notes
       isCurrent note = nTime note == now
       nvs = mergeNotes (map noteTypeHack current) (nvsFromPlaying playing)
       playing' = playingFromNvs nvs
-  in nvs : convertNotes (now + 1) future playing'
+      nl = NoteLine { lNotes = nvs, lDropped = [] }
+  in nl : convertNotes (now + 1) future playing'
 
-countVoices :: [[NoteValue]] -> Int
-countVoices = maximum . map length
+countVoices :: [NoteLine] -> Int
+countVoices = maximum . map (length . lNotes)
 
-padVoices' :: Int -> [[NoteValue]] -> [[NoteValue]]
+padVoices' :: Int -> [NoteLine] -> [NoteLine]
 padVoices' nVoices = map pad
-  where pad nvs = take nVoices $ nvs ++ repeat (-1)
+  where pad nls =
+          let nvs = lNotes nls
+              len = length nvs
+              dropped = filter (>= 0) (drop nVoices nvs)
+          in if len <= nVoices
+             then nls { lNotes = take nVoices $ nvs ++ repeat (-1) }
+             else nls { lNotes = take nVoices nvs
+                      , lDropped = dropped
+                      }
 
-padVoices :: [[NoteValue]] -> [[NoteValue]]
-padVoices nvs =
-  let nVoices = countVoices nvs
+padVoices :: [NoteLine] -> [NoteLine]
+padVoices nls =
+  let nVoices = countVoices nls
       nVoices' = if nVoices < 4 then 3 else 6
-  in padVoices' nVoices' nvs
+  in padVoices' nVoices' nls
 
 findUnusedVoice :: ChannelSet -> Channel
 findUnusedVoice cs = fu 0
