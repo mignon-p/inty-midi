@@ -55,9 +55,6 @@ data TheOptions = TheOptions
   , oErrors :: [String]
   } deriving (Eq, Show)
 
-maxChannels :: Channel
-maxChannels = 6
-
 noteNames :: [String]
 noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
@@ -84,7 +81,7 @@ formatNote :: NoteValue -> String
 formatNote nv = IM.findWithDefault "-" (fromIntegral nv) noteMap
 
 nodrums :: [String] -> [String]
-nodrums (a:b:c:rest) = a : b : c : "-" : rest
+nodrums (a:b:c:rest@(_:_)) = a : b : c : "-" : rest
 nodrums x = x
 
 formatLine :: [NoteValue] -> String
@@ -131,6 +128,19 @@ convertNotes now notes playing =
       nvs = mergeNotes (map noteTypeHack current) (nvsFromPlaying playing)
       playing' = playingFromNvs nvs
   in nvs : convertNotes (now + 1) future playing'
+
+countVoices :: [[NoteValue]] -> Int
+countVoices = maximum . map length
+
+padVoices' :: Int -> [[NoteValue]] -> [[NoteValue]]
+padVoices' nVoices = map pad
+  where pad nvs = take nVoices $ nvs ++ repeat (-1)
+
+padVoices :: [[NoteValue]] -> [[NoteValue]]
+padVoices nvs =
+  let nVoices = countVoices nvs
+      nVoices' = if nVoices < 4 then 3 else 6
+  in padVoices' nVoices' nvs
 
 findUnusedVoice :: ChannelSet -> Channel
 findUnusedVoice cs = fu 0
@@ -266,7 +276,7 @@ getMusicLines opts meta msgs =
   let notes = remapChannels $ nubOrd $ getNotes msgs
       divisor = findDivisor notes
       notes' = divTime divisor notes
-      intyNotes = convertNotes 0 notes' 0
+      intyNotes = padVoices $ convertNotes 0 notes' 0
       (intyTempo, linesPerMeasure) = computeTempo meta divisor
       title = determineTitle meta
       label = labelFromTitle title
