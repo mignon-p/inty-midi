@@ -341,9 +341,14 @@ quantize opts@(TheOptions { oQuantize = q }) meta msgs
 
 convert :: TheOptions -> FilePath -> MidiFile -> Either ErrMsg [String]
 convert opts filename (MidiFile hdr trks) =
-  let combined = combineTracks trks
-      meta = extractMetadata filename (time_division hdr) combined
-  in getMusicLines opts meta (quantize opts meta combined)
+  case (trks, hdr_format hdr) of
+    (_, MF2) -> Left "Format 2 MIDI files are not currently supported."
+    ((trk1:_), _) ->
+      let combined = combineTracks trks
+          metaTrk = absolutify 0 $ getTrackMessages trk1
+          meta = extractMetadata filename (time_division hdr) metaTrk
+      in getMusicLines opts meta (quantize opts meta combined)
+    _ -> Left "No tracks in file!"
 
 main' :: TheOptions -> FilePath -> FilePath -> IO ()
 main' opts infile outfile = do
