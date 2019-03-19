@@ -286,8 +286,16 @@ determineTitle meta = fromMaybe base (mSeqName meta)
         notSlash '\\' = False
         notSlash _ = True
 
+dedupUnderscores :: String -> String
+dedupUnderscores "" = ""
+dedupUnderscores ('_':xs) =
+  case dedupUnderscores xs of
+    rest@('_':_) -> rest
+    rest -> '_':rest
+dedupUnderscores (x:xs) = x : dedupUnderscores xs
+
 labelFromTitle :: String -> String
-labelFromTitle = map f
+labelFromTitle = dedupUnderscores . map f
   where f x = if isAlphaNum x then x else '_'
 
 getMusicLines :: TheOptions -> Metadata -> [AbsMidiMessage] -> Either ErrMsg [String]
