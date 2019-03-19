@@ -4,6 +4,7 @@ import Control.Monad
 import Data.Bits
 import Data.Char
 import Data.Containers.ListUtils
+import Data.Either
 import Data.Int
 import qualified Data.IntMap.Strict as IM
 import Data.List
@@ -26,7 +27,7 @@ type Channel = Word8
 type NoteValue = Int16
 type AbsMidiMessage = (AbsTime, MidiEvent)
 
-data NoteType = Off | On deriving (Eq, Ord, Show)
+data NoteType = Off | On | Dropped deriving (Eq, Ord, Show)
 
 data Note = Note
   { nTime :: !AbsTime
@@ -126,18 +127,20 @@ mergeNotes [] nvs = nvs
 mergeNotes (note:rest) nvs = mergeNotes rest nvs'
   where nvs' = setElem nvs (fromIntegral $ nChan note) (nVal note)
 
-noteTypeHack :: Note -> Note
-noteTypeHack note@(Note {nType = On}) = note
-noteTypeHack note = note { nVal = (-1) }
+noteTypeHack :: Note -> Either Note Note
+noteTypeHack note@(Note {nType = On}) = Right note
+noteTypeHack note@(Note {nType = Off}) = Right $ note { nVal = (-1) }
+noteTypeHack note = Left note
 
 convertNotes :: AbsTime -> [Note] -> ChannelSet -> [NoteLine]
 convertNotes _ [] _ = []
 convertNotes now notes playing =
   let (current, future) = partition isCurrent notes
       isCurrent note = nTime note == now
-      nvs = mergeNotes (map noteTypeHack current) (nvsFromPlaying playing)
+      (dropped, hacked) = partitionEithers $ map noteTypeHack current
+      nvs = mergeNotes hacked (nvsFromPlaying playing)
       playing' = playingFromNvs nvs
-      nl = NoteLine { lNotes = nvs, lDropped = [] }
+      nl = NoteLine { lNotes = nvs, lDropped = nub $ map nVal dropped }
   in nl : convertNotes (now + 1) future playing'
 
 countVoices :: [NoteLine] -> Int
@@ -152,7 +155,7 @@ padVoices' nVoices = map pad
           in if len <= nVoices
              then nls { lNotes = take nVoices $ nvs ++ repeat (-1) }
              else nls { lNotes = take nVoices nvs
-                      , lDropped = dropped
+                      , lDropped = (lDropped nls) ++ dropped
                       }
 
 padVoices :: [NoteLine] -> [NoteLine]
@@ -171,7 +174,7 @@ findUnusedVoice cs = fu 0
 remapNote :: ChannelSet
           -> CurrentNoteMap
           -> Note
-          -> (ChannelSet, CurrentNoteMap, Channel, Bool)
+          -> (ChannelSet, CurrentNoteMap, Note, Bool)
 remapNote usedVoices currentNotes note@(Note { nType = On }) =
   let newChan = findUnusedVoice usedVoices
       usedVoices' = setBit usedVoices (fromIntegral newChan)
@@ -179,16 +182,16 @@ remapNote usedVoices currentNotes note@(Note { nType = On }) =
       key = (nChan note, nVal note)
       inRange = nVal note >= lowestNote && nVal note <= highestNote
   in if inRange
-     then (usedVoices', currentNotes', newChan, True)
-     else (usedVoices, currentNotes, 0, False) -- note out of range
+     then (usedVoices', currentNotes', note { nChan = newChan }, True)
+     else (usedVoices, currentNotes, note { nChan = 0, nType = Dropped }, True) -- note out of range
 remapNote usedVoices currentNotes note =  -- nType = Off
   let key = (nChan note, nVal note)
   in case M.lookup key currentNotes of
     Just newChan ->
       let usedVoices' = clearBit usedVoices (fromIntegral newChan)
           currentNotes' = M.delete key currentNotes
-      in (usedVoices', currentNotes', newChan, True)
-    _ -> (usedVoices, currentNotes, 0, False) -- unpaired note off
+      in (usedVoices', currentNotes', note { nChan = newChan }, True)
+    _ -> (usedVoices, currentNotes, note { nChan = 0 } , False) -- unpaired note off
 
 remapChannels' :: ChannelSet
                -> CurrentNoteMap
@@ -199,8 +202,7 @@ remapChannels' usedVoices currentNotes (n:ns) =
   if ok
   then n' : remapChannels' usedVoices' currentNotes' ns
   else remapChannels' usedVoices' currentNotes' ns
-  where n' = n { nChan = newChannel }
-        (usedVoices', currentNotes', newChannel, ok) =
+  where (usedVoices', currentNotes', n', ok) =
           remapNote usedVoices currentNotes n
 
 remapChannels :: [Note] -> [Note]
