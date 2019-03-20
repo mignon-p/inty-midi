@@ -90,14 +90,22 @@ noteMap = IM.fromList $ (-2, "S") : noteList
 formatNote :: NoteValue -> String
 formatNote nv = IM.findWithDefault "-" (fromIntegral nv) noteMap
 
-nodrums :: [String] -> [String]
-nodrums (a:b:c:rest@(_:_)) = a : b : c : "-" : rest
-nodrums x = x
+formatDrum :: [NoteValue] -> String
+formatDrum [] = "-"
+formatDrum ((-2):_) = "S"
+formatDrum _ = "M2"
+
+addDrums :: String -> [String] -> [String]
+addDrums drums (a:b:c:rest) = a : b : c : drums : rest
+addDrums _ x = x -- shouldn't happen
 
 formatLine :: NoteLine -> String
-formatLine (NoteLine { lNotes = nvs, lDropped = drp }) = stmt ++ comment
+formatLine (NoteLine { lNotes = nvs, lDrums = drms, lDropped = drp }) =
+  stmt ++ comment
   where
-    stmt = indent ++ "MUSIC " ++ intercalate "," (nodrums (map formatNote nvs))
+    notes = map formatNote nvs
+    drums = formatDrum drms
+    stmt = indent ++ "MUSIC " ++ intercalate "," (addDrums drums notes)
     spaces = replicate (max 0 (40 - length stmt)) ' '
     comment = case drp of
                 [] -> ""
@@ -136,12 +144,13 @@ noteTypeHack note@(Note {nType = On}) = Right note
 noteTypeHack note@(Note {nType = Off}) = Right $ note { nVal = (-1) }
 noteTypeHack note = Left note
 
-handleDrums :: [Note] -> [NoteValue]
-handleDrums notes =
-  case (find isOn notes, notes) of
-    (Just n, _) -> [nVal n]
-    (_, []) -> []
-    _ -> [(-1)]
+handleDrums :: Bool -> [Note] -> ([NoteValue], Bool)
+handleDrums drumsPlaying notes =
+  case (find isOn notes, notes, drumsPlaying) of
+    (Just n, _, _) -> ([nVal n], True)
+    (_, [], True) -> ([(-2)], True)
+    (_, [], False) -> ([], False)
+    _ -> ([(-1)], False)
   where isOn (Note { nType = DrumOn }) = True
         isOn _ = False
 
@@ -150,21 +159,21 @@ isDrum (Note { nType = DrumOff }) = True
 isDrum (Note { nType = DrumOn }) = True
 isDrum _ = False
 
-convertNotes :: AbsTime -> [Note] -> ChannelSet -> [NoteLine]
+convertNotes :: AbsTime -> [Note] -> (ChannelSet, Bool) -> [NoteLine]
 convertNotes _ [] _ = []
-convertNotes now notes playing =
+convertNotes now notes (playing, drumsPlaying) =
   let (current, future) = partition isCurrent notes
       isCurrent note = nTime note == now
       drums = filter isDrum current
       notDrums = filter (not . isDrum) current
       (dropped, hacked) = partitionEithers $ map noteTypeHack notDrums
-      drumVals = handleDrums drums
+      (drumVals, drumsPlaying') = handleDrums drumsPlaying drums
       nvs = mergeNotes hacked (nvsFromPlaying playing)
       playing' = playingFromNvs nvs
       nl = NoteLine { lNotes = nvs,
                       lDrums = drumVals,
                       lDropped = nub $ map nVal dropped }
-  in nl : convertNotes (now + 1) future playing'
+  in nl : convertNotes (now + 1) future (playing', drumsPlaying')
 
 countVoices :: [NoteLine] -> Int
 countVoices = maximum . map (length . lNotes)
@@ -337,7 +346,7 @@ getMusicLines opts meta msgs =
   let notes = remapChannels $ nubOrd $ getNotes msgs
       divisor = findDivisor notes
       notes' = divTime divisor notes
-      intyNotes = padVoices $ convertNotes 0 notes' 0
+      intyNotes = padVoices $ convertNotes 0 notes' (0, False)
       (intyTempo, linesPerMeasure) = computeTempo meta divisor
       title = determineTitle meta
       label = labelFromTitle title
