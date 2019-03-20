@@ -27,7 +27,7 @@ type Channel = Word8
 type NoteValue = Int16
 type AbsMidiMessage = (AbsTime, MidiEvent)
 
-data NoteType = Off | On | Dropped deriving (Eq, Ord, Show)
+data NoteType = Off | On | DrumOff | DrumOn | Dropped deriving (Eq, Ord, Show)
 
 data Note = Note
   { nTime :: !AbsTime
@@ -43,6 +43,7 @@ type CurrentNoteMap = M.Map (Channel, NoteValue) Channel
 
 data NoteLine = NoteLine
   { lNotes :: [NoteValue]
+  , lDrums :: [NoteValue]
   , lDropped :: [NoteValue]
   } deriving (Eq, Show)
 
@@ -60,6 +61,9 @@ data TheOptions = TheOptions
   , oArgs :: [String] -- non-option arguments
   , oErrors :: [String]
   } deriving (Eq, Show)
+
+drumChannel :: Channel
+drumChannel = 10
 
 noteNames :: [String]
 noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -132,15 +136,34 @@ noteTypeHack note@(Note {nType = On}) = Right note
 noteTypeHack note@(Note {nType = Off}) = Right $ note { nVal = (-1) }
 noteTypeHack note = Left note
 
+handleDrums :: [Note] -> [NoteValue]
+handleDrums notes =
+  case (find isOn notes, notes) of
+    (Just n, _) -> [nVal n]
+    (_, []) -> []
+    _ -> [(-1)]
+  where isOn (Note { nType = DrumOn }) = True
+        isOn _ = False
+
+isDrum :: Note -> Bool
+isDrum (Note { nType = DrumOff }) = True
+isDrum (Note { nType = DrumOn }) = True
+isDrum _ = False
+
 convertNotes :: AbsTime -> [Note] -> ChannelSet -> [NoteLine]
 convertNotes _ [] _ = []
 convertNotes now notes playing =
   let (current, future) = partition isCurrent notes
       isCurrent note = nTime note == now
-      (dropped, hacked) = partitionEithers $ map noteTypeHack current
+      drums = filter isDrum current
+      notDrums = filter (not . isDrum) current
+      (dropped, hacked) = partitionEithers $ map noteTypeHack notDrums
+      drumVals = handleDrums drums
       nvs = mergeNotes hacked (nvsFromPlaying playing)
       playing' = playingFromNvs nvs
-      nl = NoteLine { lNotes = nvs, lDropped = nub $ map nVal dropped }
+      nl = NoteLine { lNotes = nvs,
+                      lDrums = drumVals,
+                      lDropped = nub $ map nVal dropped }
   in nl : convertNotes (now + 1) future playing'
 
 countVoices :: [NoteLine] -> Int
@@ -184,7 +207,7 @@ remapNote usedVoices currentNotes note@(Note { nType = On }) =
   in if inRange
      then (usedVoices', currentNotes', note { nChan = newChan }, True)
      else (usedVoices, currentNotes, note { nChan = 0, nType = Dropped }, True) -- note out of range
-remapNote usedVoices currentNotes note =  -- nType = Off
+remapNote usedVoices currentNotes note@(Note { nType = Off }) =
   let key = (nChan note, nVal note)
   in case M.lookup key currentNotes of
     Just newChan ->
@@ -192,6 +215,8 @@ remapNote usedVoices currentNotes note =  -- nType = Off
           currentNotes' = M.delete key currentNotes
       in (usedVoices', currentNotes', note { nChan = newChan }, True)
     _ -> (usedVoices, currentNotes, note { nChan = 0 } , False) -- unpaired note off
+remapNotes usedVoices currentNotes note =
+  (usedVoices, currentNotes, note, True) -- drums
 
 remapChannels' :: ChannelSet
                -> CurrentNoteMap
@@ -219,11 +244,18 @@ findDivisor notes =
 
 getNotes :: [AbsMidiMessage] -> [Note]
 getNotes [] = []
-getNotes ((t, VoiceEvent _ (NoteOn ch note vel)):rest) =
-  let typ = if vel == 0 then Off else On
-  in Note t ch (fromIntegral note) typ : getNotes rest
-getNotes ((t, VoiceEvent _ (NoteOff ch note _)):rest) =
-  Note t ch (fromIntegral note) Off : getNotes rest
+getNotes ((t, VoiceEvent _ (NoteOn ch note vel)):rest)
+  | ch == drumChannel =
+    let typ = if vel == 0 then DrumOff else DrumOn
+    in Note t ch (fromIntegral note) typ : getNotes rest
+  | otherwise =
+    let typ = if vel == 0 then Off else On
+    in Note t ch (fromIntegral note) typ : getNotes rest
+getNotes ((t, VoiceEvent _ (NoteOff ch note _)):rest)
+  | ch == drumChannel =
+    Note t ch (fromIntegral note) DrumOff : getNotes rest
+  | otherwise =
+    Note t ch (fromIntegral note) Off : getNotes rest
 getNotes (_:rest) = getNotes rest
 
 computeTempo' :: Double -> Double -> Double -> Double -> Double -> (Double, Double)
