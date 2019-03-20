@@ -323,7 +323,9 @@ rmExt s =
     _ -> s
 
 determineTitle :: Metadata -> String
-determineTitle meta = fromMaybe base (mSeqName meta)
+-- the metadata is too unreliable; we end up with names like "track 0"
+-- determineTitle meta = fromMaybe base (mSeqName meta)
+determineTitle meta = base
   where base = reverse $ rmExt $ takeWhile notSlash $ reverse $ mFilename meta
         notSlash '/' = False
         notSlash '\\' = False
@@ -356,7 +358,9 @@ getMusicLines opts meta msgs =
       mainLines = if (oMain opts)
                   then mainProgram title label
                   else []
-  in Right $ mainLines ++ labelLine : tempoLine : "" : insertBlankLines linesPerMeasure (map formatLine intyNotes) ++ [endLine]
+  in if intyTempo < 1
+     then Left "Needs quantization (try \"-q 16\")"
+     else Right $ mainLines ++ labelLine : tempoLine : "" : insertBlankLines linesPerMeasure (map formatLine intyNotes) ++ [endLine]
 
 absolutify :: AbsTime -> [MidiMessage] -> [AbsMidiMessage]
 absolutify _ [] = []
