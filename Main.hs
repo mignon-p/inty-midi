@@ -63,7 +63,7 @@ data TheOptions = TheOptions
   } deriving (Eq, Show)
 
 drumChannel :: Channel
-drumChannel = 10
+drumChannel = 9 -- channel 10, converted to 0-based number
 
 noteNames :: [String]
 noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -92,8 +92,8 @@ formatNote nv = IM.findWithDefault "-" (fromIntegral nv) noteMap
 
 formatDrum :: [NoteValue] -> String
 formatDrum [] = "-"
-formatDrum ((-2):_) = "S"
-formatDrum _ = "M2"
+formatDrum ((-2):_) = "-"
+formatDrum _ = "M1"
 
 addDrums :: String -> [String] -> [String]
 addDrums drums (a:b:c:rest) = a : b : c : drums : rest
@@ -224,7 +224,7 @@ remapNote usedVoices currentNotes note@(Note { nType = Off }) =
           currentNotes' = M.delete key currentNotes
       in (usedVoices', currentNotes', note { nChan = newChan }, True)
     _ -> (usedVoices, currentNotes, note { nChan = 0 } , False) -- unpaired note off
-remapNotes usedVoices currentNotes note =
+remapNote usedVoices currentNotes note =
   (usedVoices, currentNotes, note, True) -- drums
 
 remapChannels' :: ChannelSet
