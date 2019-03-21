@@ -58,7 +58,7 @@ mainProgram title label =
   , ""
   , i "GOTO RESTART"
   , ""
-  , i $ "ASM CFGVAR \"name\" = " ++ show title
+  , i $ "ASM CFGVAR \"name\" = \"" ++ escape title ++ "\""
   , ""
   ]
   where i = (indent ++)

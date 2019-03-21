@@ -29,7 +29,7 @@ RESTART:
 
     GOTO RESTART
 
-    ASM CFGVAR "name" = "Canon_in_D"
+    ASM CFGVAR "name" = "Canon in D"
 
 Canon_in_D:
     DATA 7

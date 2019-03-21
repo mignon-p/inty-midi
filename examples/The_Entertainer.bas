@@ -29,7 +29,7 @@ RESTART:
 
     GOTO RESTART
 
-    ASM CFGVAR "name" = "The_Entertainer"
+    ASM CFGVAR "name" = "The Entertainer"
 
 The_Entertainer:
     DATA 10
