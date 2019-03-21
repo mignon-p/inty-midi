@@ -5,10 +5,10 @@ domain.
 Because they are generated with the `-m` flag, the output files are
 standalone IntyBASIC programs which you can run to play the piece.
 
-## Greensleaves (Traditional)
+## Greensleeves (Traditional)
 
 * Source: <https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=109>
-* Command line: `inty-midi -m Greensleaves.mid Greensleaves.bas`
+* Command line: `inty-midi -m Greensleeves.mid Greensleeves.bas`
 
 ## Canon in D, by Johann Pachelbel
 

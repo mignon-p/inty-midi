@@ -7,7 +7,7 @@
 RESTART:
     PRINT AT 62 COLOR 5, "Press any button"
     PRINT AT 86 COLOR 5, "to play"
-    PRINT AT 124 COLOR 7, "Greensleaves"
+    PRINT AT 124 COLOR 7, "Greensleeves"
 
     WHILE CONT = 0
         WAIT
@@ -22,7 +22,7 @@ RESTART:
     WEND
 
     PLAY FULL
-    PLAY Greensleaves
+    PLAY Greensleeves
 
     WHILE MUSIC.PLAYING
         WAIT
@@ -30,9 +30,9 @@ RESTART:
 
     GOTO RESTART
 
-    ASM CFGVAR "name" = "Greensleaves"
+    ASM CFGVAR "name" = "Greensleeves"
 
-Greensleaves:
+Greensleeves:
     DATA 9
 
     MUSIC A4,-,-,-
