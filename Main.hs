@@ -268,8 +268,14 @@ getNotes ((t, VoiceEvent _ (NoteOff ch note _)):rest)
     Note t ch (fromIntegral note) Off : getNotes rest
 getNotes (_:rest) = getNotes rest
 
-computeTempo' :: Double -> Double -> Double -> Double -> Double -> (Double, Double)
-computeTempo' microsPerQuarter ticksPerQuarter ticksPerLine beatsPerMeasure beatsPerWholeNote =
+computeTempo' :: Double
+              -> Double
+              -> Double
+              -> Double
+              -> Double
+              -> Double
+              -> (Double, Double, Double)
+computeTempo' microsPerQuarter ticksPerQuarter ticksPerLine beatsPerMeasure beatsPerWholeNote pickupQuarters =
   let microsPerTick = microsPerQuarter / ticksPerQuarter
       secondsPerTick = microsPerTick / 1e6
       secondsPerLine = secondsPerTick * ticksPerLine
@@ -278,19 +284,23 @@ computeTempo' microsPerQuarter ticksPerQuarter ticksPerLine beatsPerMeasure beat
       linesPerQuarter = ticksPerQuarter / ticksPerLine
       beatsPerLine = beatsPerQuarter / linesPerQuarter
       linesPerMeasure = beatsPerMeasure / beatsPerLine
-  in (intyUnitsPerLine, linesPerMeasure)
+      pickupLines = if pickupQuarters > 0
+                    then pickupQuarters * linesPerQuarter
+                    else linesPerMeasure
+  in (intyUnitsPerLine, pickupLines, linesPerMeasure)
 
 getTicksPerQuarter :: MidiTimeDivision -> Word16
 getTicksPerQuarter (TPB x) = x
 getTicksPerQuarter _ = 384
 
-computeTempo :: Metadata -> AbsTime -> (Int, Int)
-computeTempo meta divisor =
+computeTempo :: TheOptions -> Metadata -> AbsTime -> (Int, Int, Int)
+computeTempo opts meta divisor =
   let tpq = getTicksPerQuarter $ mTimeDivision meta
       uspq = fromMaybe 500000 (mTempo meta)
       (num, denom, _, _) = fromMaybe (4, 2, 0, 0) (mTimeSig meta)
-      (intyTempo, linesPerMeasure) = computeTempo' (fromIntegral uspq) (fromIntegral tpq) (fromIntegral divisor) (fromIntegral num) (fromIntegral $ 2 ^ denom)
-  in (round intyTempo, round linesPerMeasure)
+      (intyTempo, pickup, linesPerMeasure) =
+        computeTempo' (fromIntegral uspq) (fromIntegral tpq) (fromIntegral divisor) (fromIntegral num) (fromIntegral $ 2 ^ denom) (oPickup opts)
+  in (round intyTempo, round pickup, round linesPerMeasure)
 
 handleMetaEvent :: Metadata -> MidiMetaEvent -> Metadata
 handleMetaEvent md (TextEvent SEQUENCE_NAME name) =
@@ -350,7 +360,7 @@ getMusicLines opts meta msgs =
       divisor = findDivisor notes
       notes' = divTime divisor notes
       intyNotes = padVoices $ convertNotes 0 notes' (0, False)
-      (intyTempo, linesPerMeasure) = computeTempo meta divisor
+      (intyTempo, pickup, linesPerMeasure) = computeTempo opts meta divisor
       title = determineTitle meta
       label = labelFromTitle title
       labelLine = label ++ ":"
@@ -359,7 +369,6 @@ getMusicLines opts meta msgs =
       mainLines = if (oMain opts)
                   then mainProgram title label
                   else []
-      pickup = linesPerMeasure -- TODO
       lns = insertBlankLines pickup linesPerMeasure (map formatLine intyNotes)
   in if intyTempo < 1
      then Left "Needs quantization (try \"-q 16\")"

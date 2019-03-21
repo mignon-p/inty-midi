@@ -8,7 +8,7 @@ standalone IntyBASIC programs which you can run to play the piece.
 ## Greensleeves (Traditional)
 
 * Source: <https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=109>
-* Command line: `inty-midi -m Greensleeves.mid Greensleeves.bas`
+* Command line: `inty-midi -m -p 1 Greensleeves.mid Greensleeves.bas`
 
 ## Canon in D, by Johann Pachelbel
 
