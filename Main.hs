@@ -57,6 +57,7 @@ data Metadata = Metadata
 
 data TheOptions = TheOptions
   { oMain :: Bool
+  , oPickup :: Double -- number of quarter notes in first measure
   , oQuantize :: Int -- quantize to 1/oQuantize notes (e. g. 16 for 16th notes)
   , oArgs :: [String] -- non-option arguments
   , oErrors :: [String]
@@ -310,11 +311,11 @@ extractMetadata :: FilePath -> MidiTimeDivision -> [AbsMidiMessage] -> Metadata
 extractMetadata filename timeDiv =
   extractMetadata' $ Metadata filename timeDiv Nothing Nothing Nothing
 
-insertBlankLines :: Int -> [String] -> [String]
-insertBlankLines _ [] = []
-insertBlankLines lpm lns =
-  let (x, y) = splitAt lpm lns
-  in x ++ [""] ++ insertBlankLines lpm y
+insertBlankLines :: Int -> Int -> [String] -> [String]
+insertBlankLines _ _ [] = []
+insertBlankLines pickup lpm lns =
+  let (x, y) = splitAt pickup lns
+  in x ++ [""] ++ insertBlankLines lpm lpm y
 
 rmExt :: String -> String
 rmExt s =
@@ -358,9 +359,11 @@ getMusicLines opts meta msgs =
       mainLines = if (oMain opts)
                   then mainProgram title label
                   else []
+      pickup = linesPerMeasure -- TODO
+      lns = insertBlankLines pickup linesPerMeasure (map formatLine intyNotes)
   in if intyTempo < 1
      then Left "Needs quantization (try \"-q 16\")"
-     else Right $ mainLines ++ labelLine : tempoLine : "" : insertBlankLines linesPerMeasure (map formatLine intyNotes) ++ [endLine]
+     else Right $ mainLines ++ labelLine : tempoLine : "" : lns ++ [endLine]
 
 absolutify :: AbsTime -> [MidiMessage] -> [AbsMidiMessage]
 absolutify _ [] = []
@@ -368,7 +371,7 @@ absolutify now ((delta, ev):rest) =
   let next = now + fromIntegral delta
   in (next, ev) : absolutify next rest
 
--- sort primarily by absolute time, but for message of equal time,
+-- sort primarily by absolute time, but for messages of equal time,
 -- put NoteOn messages after the NoteOff messages, because NoteOff
 -- may free up voices that can be used by NoteOn
 absSortKey :: AbsMidiMessage -> (AbsTime, Bool)
@@ -422,11 +425,17 @@ main' opts infile outfile = do
 
 extractOptions :: [String] -> TheOptions
 extractOptions [] = TheOptions { oMain = False
+                               , oPickup = 0
                                , oQuantize = 0
                                , oArgs = []
                                , oErrors = []
                                }
 extractOptions ("-m" : args) = (extractOptions args) { oMain = True }
+extractOptions ("-p" : p : args) =
+  case readMaybe p of
+    Just p' -> (extractOptions args) { oPickup = p' }
+    _ -> let args' = extractOptions args
+         in args' { oErrors = "Argument to -p must be an number (floating point OK)" : oErrors args' }
 extractOptions ("-q" : n : args) =
   case readMaybe n of
     Just n' -> (extractOptions args) { oQuantize = n' }
@@ -450,5 +459,6 @@ main = do
       forM_ errs e
       e "Usage: inty-midi [-m] [-q n] input.mid output.bas"
       e "    -m    include a main program in output"
+      e "    -p n  number of quarter notes in first measure (can be fractional)"
       e "    -q n  quantize to 1/n notes (e. g. 16 for 16th notes)"
       exitFailure
