@@ -1,13 +1,12 @@
     CLS
     MODE 0, 1, 1, 1, 1
     BORDER 1
-    DEFINE 0, 1, ASCII_CHARS
     WAIT
 
 RESTART:
     PRINT AT 62 COLOR 5, "Press any button"
     PRINT AT 86 COLOR 5, "to play"
-    PRINT AT 122 COLOR 7, "The\256Entertainer"
+    PRINT AT 122 COLOR 7, "The Entertainer"
 
     WHILE CONT = 0
         WAIT
@@ -31,16 +30,6 @@ RESTART:
     GOTO RESTART
 
     ASM CFGVAR "name" = "The_Entertainer"
-
-ASCII_CHARS:
-    BITMAP "........"
-    BITMAP "........"
-    BITMAP "........"
-    BITMAP "........"
-    BITMAP "........"
-    BITMAP "........"
-    BITMAP "........"
-    BITMAP "********"
 
 The_Entertainer:
     DATA 10

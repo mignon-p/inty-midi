@@ -1,7 +1,6 @@
     CLS
     MODE 0, 1, 1, 1, 1
     BORDER 1
-
     WAIT
 
 RESTART:
