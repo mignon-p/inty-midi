@@ -10,6 +10,11 @@ standalone IntyBASIC programs which you can run to play the piece.
 * Source: <https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=109>
 * Command line: `inty-midi -m -p 1 Greensleeves.mid Greensleeves.bas`
 
+Greensleeves begins with a quarter note pickup note, which is why the
+option `-p 1` is needed.  (It is only needed for proper insertion of
+blank lines in the output; the music would still sound correct without
+it.)
+
 ## Canon in D, by Johann Pachelbel
 
 * Source: <https://musescore.com/user/3349846/scores/1376056>
