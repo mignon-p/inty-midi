@@ -48,6 +48,7 @@ type InstMap = IM.IntMap Instrument
 
 data NoteLine = NoteLine
   { lNotes :: [NoteValue]
+  , lInsts :: [Instrument]
   , lDrums :: [NoteValue]
   , lDropped :: [NoteValue]
   } deriving (Eq, Show)
@@ -173,9 +174,13 @@ isDrum (Note { nType = DrumOff }) = True
 isDrum (Note { nType = DrumOn }) = True
 isDrum _ = False
 
-convertNotes :: AbsTime -> [Note] -> (ChannelSet, Bool) -> [NoteLine]
-convertNotes _ [] _ = []
-convertNotes now notes (playing, drumsPlaying) =
+convertNotes :: AbsTime
+             -> [Note]
+             -> (ChannelSet, Bool)
+             -> [Instrument]
+             -> [NoteLine]
+convertNotes _ [] _ _ = []
+convertNotes now notes (playing, drumsPlaying) insts =
   let (current, future) = partition isCurrent notes
       isCurrent note = nTime note == now
       drums = filter isDrum current
@@ -183,11 +188,13 @@ convertNotes now notes (playing, drumsPlaying) =
       (dropped, hacked) = partitionEithers $ map noteTypeHack notDrums
       (drumVals, drumsPlaying') = handleDrums drumsPlaying drums
       nvs = mergeNotes hacked (nvsFromPlaying playing)
+      insts' = mergeInsts notDrums insts
       playing' = playingFromNvs nvs
       nl = NoteLine { lNotes = nvs,
+                      lInsts = insts',
                       lDrums = drumVals,
                       lDropped = nub $ map nVal dropped }
-  in nl : convertNotes (now + 1) future (playing', drumsPlaying')
+  in nl : convertNotes (now + 1) future (playing', drumsPlaying') insts'
 
 countVoices :: [NoteLine] -> Int
 countVoices = maximum . map (length . lNotes)
@@ -393,7 +400,7 @@ getMusicLines opts meta msgs =
   let notes = remapChannels $ nubOrd $ getNotes IM.empty msgs
       divisor = findDivisor notes
       notes' = divTime divisor notes
-      intyNotes = padVoices $ convertNotes 0 notes' (0, False)
+      intyNotes = padVoices $ convertNotes 0 notes' (0, False) []
       (intyTempo, pickup, linesPerMeasure) = computeTempo opts meta divisor
       title = determineTitle meta
       label = labelFromTitle title
