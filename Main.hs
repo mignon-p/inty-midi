@@ -134,16 +134,24 @@ playingFromNvs (nv:nvs) = f nv .|. (playingFromNvs nvs `shiftL` 1)
   where f (-1) = 0
         f _ = 1
 
-setElem :: [NoteValue] -> Int -> NoteValue -> [NoteValue]
-setElem xs idx x =
+-- Sets element idx of list xs to x.  If idx is greater than
+-- list length, fills unused indices with dflt.
+setElem :: a -> [a] -> Int -> a -> [a]
+setElem dflt xs idx x =
   case splitAt idx xs of
     (before, (_:after)) -> before ++ x : after
-    _ -> take idx (xs ++ repeat (-1)) ++ [x]
+    _ -> take idx (xs ++ repeat dflt) ++ [x]
 
 mergeNotes :: [Note] -> [NoteValue] -> [NoteValue]
 mergeNotes [] nvs = nvs
 mergeNotes (note:rest) nvs = mergeNotes rest nvs'
-  where nvs' = setElem nvs (fromIntegral $ nChan note) (nVal note)
+  where nvs' = setElem (-1) nvs (fromIntegral $ nChan note) (nVal note)
+
+mergeInsts :: [Note] -> [Instrument] -> [Instrument]
+mergeInsts [] insts = insts
+mergeInsts (note@(Note { nType = On inst }):rest) insts = mergeInsts rest insts'
+  where insts' = setElem Piano insts (fromIntegral $ nChan note) inst
+mergeInsts (_:rest) insts = mergeInsts rest insts
 
 noteTypeHack :: Note -> Either Note Note
 noteTypeHack note@(Note {nType = On _}) = Right note
