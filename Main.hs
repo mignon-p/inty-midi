@@ -24,10 +24,14 @@ import PreviewProgram
 
 type AbsTime = Word64
 type Channel = Word8
+type Program = Word8
 type NoteValue = Int16
 type AbsMidiMessage = (AbsTime, MidiEvent)
 
-data NoteType = Off | On | DrumOff | DrumOn | Dropped deriving (Eq, Ord, Show)
+data Instrument = Piano | Clarinet | Flute | Bass deriving (Eq, Ord, Show)
+
+data NoteType = Off | On !Instrument | DrumOff | DrumOn | Dropped
+  deriving (Eq, Ord, Show)
 
 data Note = Note
   { nTime :: !AbsTime
@@ -40,6 +44,7 @@ type ChannelSet = Word16
 type ChannelMap = IM.IntMap Channel
 type NoteMap = IM.IntMap String
 type CurrentNoteMap = M.Map (Channel, NoteValue) Channel
+type InstMap = IM.IntMap Instrument
 
 data NoteLine = NoteLine
   { lNotes :: [NoteValue]
@@ -141,7 +146,7 @@ mergeNotes (note:rest) nvs = mergeNotes rest nvs'
   where nvs' = setElem nvs (fromIntegral $ nChan note) (nVal note)
 
 noteTypeHack :: Note -> Either Note Note
-noteTypeHack note@(Note {nType = On}) = Right note
+noteTypeHack note@(Note {nType = On _}) = Right note
 noteTypeHack note@(Note {nType = Off}) = Right $ note { nVal = (-1) }
 noteTypeHack note = Left note
 
@@ -208,7 +213,7 @@ remapNote :: ChannelSet
           -> CurrentNoteMap
           -> Note
           -> (ChannelSet, CurrentNoteMap, Note, Bool)
-remapNote usedVoices currentNotes note@(Note { nType = On }) =
+remapNote usedVoices currentNotes note@(Note { nType = On _ }) =
   let newChan = findUnusedVoice usedVoices
       usedVoices' = setBit usedVoices (fromIntegral newChan)
       currentNotes' = M.insert key newChan currentNotes
@@ -252,21 +257,42 @@ findDivisor notes =
   let times = nubOrd $ map nTime notes
   in foldr gcd 0 times
 
-getNotes :: [AbsMidiMessage] -> [Note]
-getNotes [] = []
-getNotes ((t, VoiceEvent _ (NoteOn ch note vel)):rest)
+bass_lo, bass_hi, reed_lo, reed_hi, pipe_lo, pipe_hi :: Program
+bass_lo = 33
+bass_hi = 40
+reed_lo = 65
+reed_hi = 72
+pipe_lo = 73
+pipe_hi = 80
+
+-- takes a 1-based (not 0-based) program number, as given on:
+-- https://en.wikipedia.org/wiki/General_MIDI#Program_change_events
+instFromProg :: Program -> Instrument
+instFromProg prog
+  | prog >= bass_lo && prog <= bass_hi = Bass
+  | prog >= reed_lo && prog <= reed_hi = Clarinet
+  | prog >= pipe_lo && prog <= pipe_hi = Flute
+  | otherwise = Piano
+
+getNotes :: InstMap -> [AbsMidiMessage] -> [Note]
+getNotes _ [] = []
+getNotes im ((t, VoiceEvent _ (NoteOn ch note vel)):rest)
   | ch == drumChannel =
     let typ = if vel == 0 then DrumOff else DrumOn
-    in Note t ch (fromIntegral note) typ : getNotes rest
+    in Note t ch (fromIntegral note) typ : getNotes im rest
   | otherwise =
-    let typ = if vel == 0 then Off else On
-    in Note t ch (fromIntegral note) typ : getNotes rest
-getNotes ((t, VoiceEvent _ (NoteOff ch note _)):rest)
+    let typ = if vel == 0 then Off else On inst
+        inst = IM.findWithDefault Piano (fromIntegral ch) im
+    in Note t ch (fromIntegral note) typ : getNotes im rest
+getNotes im ((t, VoiceEvent _ (NoteOff ch note _)):rest)
   | ch == drumChannel =
-    Note t ch (fromIntegral note) DrumOff : getNotes rest
+    Note t ch (fromIntegral note) DrumOff : getNotes im rest
   | otherwise =
-    Note t ch (fromIntegral note) Off : getNotes rest
-getNotes (_:rest) = getNotes rest
+    Note t ch (fromIntegral note) Off : getNotes im rest
+getNotes im ((t, VoiceEvent _ (ProgramChange ch prog)):rest) =
+  let im' = IM.insert (fromIntegral ch) (instFromProg (prog + 1)) im
+  in getNotes im' rest
+getNotes im (_:rest) = getNotes im rest
 
 computeTempo' :: Double
               -> Double
@@ -356,7 +382,7 @@ labelFromTitle = dedupUnderscores . map f
 
 getMusicLines :: TheOptions -> Metadata -> [AbsMidiMessage] -> Either ErrMsg [String]
 getMusicLines opts meta msgs =
-  let notes = remapChannels $ nubOrd $ getNotes msgs
+  let notes = remapChannels $ nubOrd $ getNotes IM.empty msgs
       divisor = findDivisor notes
       notes' = divTime divisor notes
       intyNotes = padVoices $ convertNotes 0 notes' (0, False)
