@@ -34,10 +34,10 @@ RESTART:
 Greensleeves:
     DATA 9
 
-    MUSIC A4,-,-,-
+    MUSIC A4W,-,-,-
     MUSIC S,-,-,-
 
-    MUSIC C5,A3,-,-
+    MUSIC C5,A3W,-,-
     MUSIC S,S,-,-
     MUSIC S,S,-,-
     MUSIC S,S,-,-
@@ -149,7 +149,7 @@ Greensleeves:
     MUSIC S,S,-,-
     MUSIC S,S,-,-
 
-    MUSIC G5,C4,E4,-
+    MUSIC G5,C4,E4W,-
     MUSIC S,S,S,-
     MUSIC S,S,S,-
     MUSIC S,S,S,-

@@ -34,7 +34,7 @@ RESTART:
 Canon_in_D:
     DATA 7
 
-    MUSIC D3,-,-,-
+    MUSIC D3W,-,-,-
     MUSIC S,-,-,-
     MUSIC F3#,-,-,-
     MUSIC S,-,-,-
@@ -102,7 +102,7 @@ Canon_in_D:
     MUSIC A3,-,-,-
     MUSIC S,-,-,-
 
-    MUSIC F5#,D3,-,-
+    MUSIC F5#,D3W,-,-
     MUSIC S,S,-,-
     MUSIC S,F3#,-,-
     MUSIC S,S,-,-
@@ -170,7 +170,7 @@ Canon_in_D:
     MUSIC S,A3,-,-
     MUSIC S,S,-,-
 
-    MUSIC D5,F5#,D3,-
+    MUSIC D5,F5#,D3W,-
     MUSIC S,S,S,-
     MUSIC S,S,F3#,-
     MUSIC S,S,S,-

@@ -34,7 +34,7 @@ RESTART:
 The_Entertainer:
     DATA 10
 
-    MUSIC D5,D6,-,-,-,-,-
+    MUSIC D5W,D6W,-,-,-,-,-
     MUSIC E5,E6,-,-,-,-,-
     MUSIC C5,C6,-,-,-,-,-
     MUSIC A4,A5,-,-,-,-,-
@@ -65,7 +65,7 @@ The_Entertainer:
     MUSIC S,S,-,-,-,-,-
     MUSIC -,-,-,-,-,-,-
     MUSIC -,-,-,-,-,-,-
-    MUSIC G5,D5,B4,-,G4,G2,-            ' dropped G1
+    MUSIC G5,D5,B4W,-,G4W,G2W,-         ' dropped G1
     MUSIC S,S,S,-,S,S,-
     MUSIC D4,B3,G3,-,-,-,-
     MUSIC D4#,S,S,-,-,-,-
@@ -90,7 +90,7 @@ The_Entertainer:
 
     MUSIC E6,G5,E5,-,G2,-,-
     MUSIC C6,E5,C5,-,S,-,-
-    MUSIC D5,D6,F5,-,G3,C4,E3
+    MUSIC D5,D6,F5,-,G3,C4,E3W
     MUSIC G5,E5,E6,-,S,S,S
     MUSIC S,S,S,-,G2,-,-
     MUSIC B5,D5,B4,-,S,-,-

@@ -16,8 +16,9 @@ supported by IntyBASIC ([C2 to C7][5]).
 
 IntyBASIC has some support for drums, and `inty-midi` will convert any
 note on [Channel 10][6] into an `M1` drum note.  (This has only been
-minimally tested.)  Notes on any other MIDI channel are played on the
-IntyBASIC default instrument (piano).
+minimally tested.)  Notes on any other MIDI channel are played on one
+of the four IntyBASIC instruments: piano, clarinet, flute, or bass.
+(See "Program Change", below.)
 
 `inty-midi` reads the time signature from the MIDI file, and
 automatically places a blank line in the output between each measure,
@@ -60,6 +61,8 @@ already quantized, you can ask `inty-midi` to do it for you with the
 
 The following could all be signs that you need to quantize the input:
 
+* `inty-midi` fails with the error `Needs quantization`
+
 * `inty-midi` takes a long time to run (normally it should be almost
   instantaneous)
 
@@ -67,7 +70,7 @@ The following could all be signs that you need to quantize the input:
 
 * `as1600` fails with the error `Address overflow`
 
-* `inty-midi` fails with the error `Needs quantization`
+* the resulting ROM crashes when run
 
 Generally you want to quantize as much as possible (i. e. a `-q`
 parameter as small as possible) without losing notes or making the
@@ -77,6 +80,19 @@ Unfortunately, the IntyBASIC music player does not handle triplets
 well.  In order to play triplets accurately, while also playing
 sixteenth notes accurately, you would need to quantize to forty-eighth
 notes, which generally is not quantized enough for good results.
+
+## Program Change
+
+IntyBASIC supports four instruments: Piano (W), Clarinet (X), Flute
+(Y), and Bass (Z).  `inty-midi` does its best to map the
+[General MIDI Program Change messages][12] to the four instruments:
+
+* Bass (33-40) maps to Bass (Z)
+* Reed (65-72) maps to Clarinet (X)
+* Pipe (73-80) maps to Flute (Y)
+* Everything else maps to Piano (W)
+
+This feature has only been minimally tested.
 
 ## Building from source
 
@@ -106,3 +122,4 @@ wherever you want to have it.
 [9]: https://www.haskell.org/cabal/
 [10]: https://haskellstack.org/
 [11]: https://docs.haskellstack.org/en/stable/install_and_upgrade/
+[12]: https://en.wikipedia.org/wiki/General_MIDI#Program_change_events
