@@ -316,25 +316,27 @@ instFromProg prog
   | prog >= pipe_lo && prog <= pipe_hi = Flute
   | otherwise = Piano
 
-getNotes :: InstMap -> [AbsMidiMessage] -> [Note]
-getNotes _ [] = []
-getNotes im ((t, VoiceEvent _ (NoteOn ch note vel)):rest)
+getNotes :: Instrument -> InstMap -> [AbsMidiMessage] -> [Note]
+getNotes _ _ [] = []
+getNotes inst im ((t, VoiceEvent _ (NoteOn ch note vel)):rest)
   | ch == drumChannel =
     let typ = if vel == 0 then DrumOff else DrumOn
-    in Note t ch (fromIntegral note) typ : getNotes im rest
+    in Note t ch (fromIntegral note) typ : getNotes inst im rest
   | otherwise =
-    let typ = if vel == 0 then Off else On inst
-        inst = IM.findWithDefault Piano (fromIntegral ch) im
-    in Note t ch (fromIntegral note) typ : getNotes im rest
-getNotes im ((t, VoiceEvent _ (NoteOff ch note _)):rest)
+    let typ = if vel == 0 then Off else On inst'
+        inst' = case inst of
+                  NoInst -> IM.findWithDefault Piano (fromIntegral ch) im
+                  _ -> inst
+    in Note t ch (fromIntegral note) typ : getNotes inst im rest
+getNotes inst im ((t, VoiceEvent _ (NoteOff ch note _)):rest)
   | ch == drumChannel =
-    Note t ch (fromIntegral note) DrumOff : getNotes im rest
+    Note t ch (fromIntegral note) DrumOff : getNotes inst im rest
   | otherwise =
-    Note t ch (fromIntegral note) Off : getNotes im rest
-getNotes im ((t, VoiceEvent _ (ProgramChange ch prog)):rest) =
+    Note t ch (fromIntegral note) Off : getNotes inst im rest
+getNotes inst im ((t, VoiceEvent _ (ProgramChange ch prog)):rest) =
   let im' = IM.insert (fromIntegral ch) (instFromProg (prog + 1)) im
-  in getNotes im' rest
-getNotes im (_:rest) = getNotes im rest
+  in getNotes inst im' rest
+getNotes inst im (_:rest) = getNotes inst im rest
 
 computeTempo' :: Double
               -> Double
@@ -424,7 +426,7 @@ labelFromTitle = dedupUnderscores . map f
 
 getMusicLines :: TheOptions -> Metadata -> [AbsMidiMessage] -> Either ErrMsg [String]
 getMusicLines opts meta msgs =
-  let notes = remapChannels $ nubOrd $ getNotes IM.empty msgs
+  let notes = remapChannels $ nubOrd $ getNotes (oInst opts) IM.empty msgs
       divisor = findDivisor notes
       notes' = divTime divisor notes
       intyNotes = padVoices $ convertNotes 0 notes' (0, False) []
