@@ -28,7 +28,7 @@ type Program = Word8
 type NoteValue = Int16
 type AbsMidiMessage = (AbsTime, MidiEvent)
 
-data Instrument = Piano | Clarinet | Flute | Bass deriving (Eq, Ord, Show)
+data Instrument = NoInst | Piano | Clarinet | Flute | Bass deriving (Eq, Ord, Show)
 
 data NoteType = Off | On !Instrument | DrumOff | DrumOn | Dropped
   deriving (Eq, Ord, Show)
@@ -94,8 +94,25 @@ highestNote = 96
 noteMap :: NoteMap
 noteMap = IM.fromList $ (-2, "S") : noteList
 
-formatNote :: NoteValue -> String
-formatNote nv = IM.findWithDefault "-" (fromIntegral nv) noteMap
+formatNoteName :: NoteValue -> String
+formatNoteName nv = IM.findWithDefault "-" (fromIntegral nv) noteMap
+
+formatInstChar :: Instrument -> String
+formatInstChar Piano = "W"
+formatInstChar Clarinet = "X"
+formatInstChar Flute = "Y"
+formatInstChar Bass = "Z"
+formatInstChar _ = ""
+
+formatNote :: NoteValue -> Instrument -> Instrument -> String
+formatNote nv inst prevInst =
+  let nn = formatNoteName nv
+      instChar = if inst == prevInst
+                 then ""
+                 else formatInstChar inst
+  in case nn of
+    "-" -> "-"
+    _ -> nn ++ instChar
 
 formatDrum :: [NoteValue] -> String
 formatDrum [] = "-"
@@ -106,17 +123,18 @@ addDrums :: String -> [String] -> [String]
 addDrums drums (a:b:c:rest) = a : b : c : drums : rest
 addDrums _ x = x -- shouldn't happen
 
-formatLine :: NoteLine -> String
-formatLine (NoteLine { lNotes = nvs, lDrums = drms, lDropped = drp }) =
-  stmt ++ comment
+formatLines :: [Instrument] -> [NoteLine] -> [String]
+formatLines _ [] = []
+formatLines prevInsts ((NoteLine { lNotes = nvs, lInsts = insts, lDrums = drms, lDropped = drp }):rest) =
+  (stmt ++ comment) : formatLines insts rest
   where
-    notes = map formatNote nvs
+    notes = zipWith3 formatNote nvs (insts ++ repeat NoInst) (prevInsts ++ repeat NoInst)
     drums = formatDrum drms
     stmt = indent ++ "MUSIC " ++ intercalate "," (addDrums drums notes)
     spaces = replicate (max 0 (40 - length stmt)) ' '
     comment = case drp of
                 [] -> ""
-                xs -> spaces ++ "' dropped " ++ intercalate ", " (map formatNote xs)
+                xs -> spaces ++ "' dropped " ++ intercalate ", " (map formatNoteName xs)
 
 nvsFromPlaying' :: ChannelSet -> Int -> [NoteValue]
 nvsFromPlaying' 0 _ = []
@@ -151,7 +169,7 @@ mergeNotes (note:rest) nvs = mergeNotes rest nvs'
 mergeInsts :: [Note] -> [Instrument] -> [Instrument]
 mergeInsts [] insts = insts
 mergeInsts (note@(Note { nType = On inst }):rest) insts = mergeInsts rest insts'
-  where insts' = setElem Piano insts (fromIntegral $ nChan note) inst
+  where insts' = setElem NoInst insts (fromIntegral $ nChan note) inst
 mergeInsts (_:rest) insts = mergeInsts rest insts
 
 noteTypeHack :: Note -> Either Note Note
@@ -410,7 +428,7 @@ getMusicLines opts meta msgs =
       mainLines = if (oMain opts)
                   then mainProgram title label
                   else []
-      lns = insertBlankLines pickup linesPerMeasure (map formatLine intyNotes)
+      lns = insertBlankLines pickup linesPerMeasure (formatLines [] intyNotes)
   in if intyTempo < 1
      then Left "Needs quantization (try \"-q 16\")"
      else Right $ mainLines ++ labelLine : tempoLine : "" : lns ++ [endLine]
