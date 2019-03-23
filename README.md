@@ -35,10 +35,12 @@ by `inty-midi`, see the [examples](examples) directory.
 
 ```
 Usage: inty-midi [-i inst] [-m] [-p n] [-q n] input.mid output.bas
+       inty-midi -v
     -i inst  use specified instrument (W, X, Y, or Z)
     -m       include a main program in output
     -p n     number of quarter notes in first measure (can be fractional)
     -q n     quantize to 1/n notes (e. g. 16 for 16th notes)
+    -v       print version number and exit
 ```
 
 The `-i` option specifies an instrument.  If specified, this

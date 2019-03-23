@@ -11,15 +11,18 @@ import Data.List
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Ord
+import Data.Version
 import Data.Word
 import System.Environment
 import System.Exit
+import System.Info (compilerName, compilerVersion)
 import System.IO
 import Text.Read
 import ZMidi.Core.Canonical
 import ZMidi.Core.Datatypes
 import ZMidi.Core.ReadFile
 
+import Paths_inty_midi (version)
 import PreviewProgram
 
 type AbsTime = Word64
@@ -62,12 +65,13 @@ data Metadata = Metadata
   } deriving (Eq, Show)
 
 data TheOptions = TheOptions
-  { oInst :: Instrument
-  , oMain :: Bool
-  , oPickup :: Double -- number of quarter notes in first measure
-  , oQuantize :: Int -- quantize to 1/oQuantize notes (e. g. 16 for 16th notes)
-  , oArgs :: [String] -- non-option arguments
-  , oErrors :: [String]
+  { oInst     :: Instrument
+  , oMain     :: Bool     -- generate a standalone IntyBASIC program
+  , oPickup   :: Double   -- number of quarter notes in first measure
+  , oQuantize :: Int  -- quantize to 1/oQuantize notes (e. g. 16 for 16th notes)
+  , oVersion  :: Bool     -- print version number and exit
+  , oArgs     :: [String] -- non-option arguments
+  , oErrors   :: [String] -- errors when parsing options
   } deriving (Eq, Show)
 
 drumChannel :: Channel
@@ -507,6 +511,7 @@ extractOptions [] = TheOptions { oInst = NoInst
                                , oMain = False
                                , oPickup = 0
                                , oQuantize = 0
+                               , oVersion = False
                                , oArgs = []
                                , oErrors = []
                                }
@@ -526,6 +531,7 @@ extractOptions ("-q" : n : args) =
     Just n' -> (extractOptions args) { oQuantize = n' }
     _ -> let args' = extractOptions args
          in args' { oErrors = "Argument to -q must be an integer" : oErrors args' }
+extractOptions ("-v" : args) = (extractOptions args) { oVersion = True }
 extractOptions (bad@('-':_):args) =
   let args' = extractOptions args
   in args' { oErrors = ("Unrecognized option " ++ bad) : oErrors args' }
@@ -533,18 +539,32 @@ extractOptions (arg:args) =
   let args' = extractOptions args
   in args' { oArgs = arg : oArgs args' }
 
+printVersion :: IO ()
+printVersion = do
+  let pkg = "inty-midi " ++ showVersion version
+      compiler = compilerName ++ " " ++ showVersion compilerVersion
+  putStrLn $ pkg ++ " (built with " ++ compiler ++ ")"
+  putStrLn "© 2019 Patrick Pelletier, BSD 3-clause license"
+  putStrLn "code@funwithsoftware.org"
+  putStrLn "https://github.com/ppelleti/inty-midi"
+
 main :: IO ()
 main = do
   args <- getArgs
   let opts = extractOptions args
+  when (oVersion opts) $ do
+    printVersion
+    exitSuccess
   case (oErrors opts, oArgs opts) of
     ([], [infile, outfile]) -> main' opts infile outfile
     (errs, _) -> do
       let e = hPutStrLn stderr
       forM_ errs e
       e "Usage: inty-midi [-i inst] [-m] [-p n] [-q n] input.mid output.bas"
+      e "       inty-midi -v"
       e "    -i inst  use specified instrument (W, X, Y, or Z)"
       e "    -m       include a main program in output"
       e "    -p n     number of quarter notes in first measure (can be fractional)"
       e "    -q n     quantize to 1/n notes (e. g. 16 for 16th notes)"
+      e "    -v       print version number and exit"
       exitFailure

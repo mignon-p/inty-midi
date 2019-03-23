@@ -16,7 +16,14 @@ version:             0.1.0.0
 synopsis:            Convert MIDI files to IntyBASIC format.
 
 -- A longer description of the package.
--- description:
+description:
+    @inty-midi@ is a program which will convert a MIDI file into a
+    format playable by IntyBASIC on an Intellivision game
+    console.  Specifically, @inty-midi@ generates an IntyBASIC file
+    containing @MUSIC@ lines, which can then be included in an IntyBASIC
+    program with the @include@ directive.  (Or, when given the @-m@
+    command-line option, @inty-midi@ generates a stand-alone IntyBASIC
+    file which will play the music when run.)
 
 -- The license under which the package is released.
 license:             BSD3
@@ -32,7 +39,9 @@ author:              Patrick Pelletier
 maintainer:          code@funwithsoftware.org
 
 -- A copyright notice.
--- copyright:
+copyright:           © 2019 Patrick Pelletier
+
+homepage:            https://github.com/ppelleti/inty-midi
 
 category:            Sound
 
@@ -45,13 +54,21 @@ extra-source-files:  ChangeLog.md
 -- Constraint on the version of Cabal needed to build this package.
 cabal-version:       >=1.10
 
+tested-with:         GHC == 7.8.3
+                   , GHC == 8.6.4
+
+source-repository head
+  Type:     git
+  Location: https://github.com/ppelleti/inty-midi.git
+
 
 executable inty-midi
   -- .hs or .lhs file containing the Main module.
   main-is:             Main.hs
 
   -- Modules included in this executable, other than Main.
-  other-modules:       PreviewProgram
+  other-modules:       Paths_inty_midi
+                     , PreviewProgram
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
