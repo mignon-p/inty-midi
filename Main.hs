@@ -62,7 +62,8 @@ data Metadata = Metadata
   } deriving (Eq, Show)
 
 data TheOptions = TheOptions
-  { oMain :: Bool
+  { oInst :: Instrument
+  , oMain :: Bool
   , oPickup :: Double -- number of quarter notes in first measure
   , oQuantize :: Int -- quantize to 1/oQuantize notes (e. g. 16 for 16th notes)
   , oArgs :: [String] -- non-option arguments
@@ -103,6 +104,14 @@ formatInstChar Clarinet = "X"
 formatInstChar Flute = "Y"
 formatInstChar Bass = "Z"
 formatInstChar _ = ""
+
+instFromChar :: String -> Maybe Instrument
+instFromChar "W" = Just Piano
+instFromChar "X" = Just Clarinet
+instFromChar "Y" = Just Flute
+instFromChar "Z" = Just Bass
+instFromChar "" = Just NoInst
+instFromChar _ = Nothing
 
 formatNote :: NoteValue -> Instrument -> Instrument -> String
 formatNote nv inst prevInst =
@@ -492,12 +501,18 @@ main' opts infile outfile = do
         Right lns -> writeFile outfile $ unlines lns
 
 extractOptions :: [String] -> TheOptions
-extractOptions [] = TheOptions { oMain = False
+extractOptions [] = TheOptions { oInst = NoInst
+                               , oMain = False
                                , oPickup = 0
                                , oQuantize = 0
                                , oArgs = []
                                , oErrors = []
                                }
+extractOptions ("-i" : s : args) =
+  case instFromChar (map toUpper s) of
+    Just inst -> (extractOptions args) { oInst = inst }
+    _ -> let args' = extractOptions args
+         in args' { oErrors = "Argument to -i must be W, X, Y, or Z" : oErrors args' }
 extractOptions ("-m" : args) = (extractOptions args) { oMain = True }
 extractOptions ("-p" : p : args) =
   case readMaybe p of
@@ -525,8 +540,9 @@ main = do
     (errs, _) -> do
       let e = hPutStrLn stderr
       forM_ errs e
-      e "Usage: inty-midi [-m] [-q n] input.mid output.bas"
-      e "    -m    include a main program in output"
-      e "    -p n  number of quarter notes in first measure (can be fractional)"
-      e "    -q n  quantize to 1/n notes (e. g. 16 for 16th notes)"
+      e "Usage: inty-midi [-i inst] [-m] [-p n] [-q n] input.mid output.bas"
+      e "    -i inst  use specified instrument (W, X, Y, or Z)"
+      e "    -m       include a main program in output"
+      e "    -p n     number of quarter notes in first measure (can be fractional)"
+      e "    -q n     quantize to 1/n notes (e. g. 16 for 16th notes)"
       exitFailure
