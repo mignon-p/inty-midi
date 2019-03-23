@@ -31,11 +31,21 @@ of a file.
 ## Usage
 
 ```
-Usage: inty-midi [-m] [-q n] input.mid output.bas
-    -m    include a main program in output
-    -p n  number of quarter notes in first measure (can be fractional)
-    -q n  quantize to 1/n notes (e. g. 16 for 16th notes)
+Usage: inty-midi [-i inst] [-m] [-p n] [-q n] input.mid output.bas
+    -i inst  use specified instrument (W, X, Y, or Z)
+    -m       include a main program in output
+    -p n     number of quarter notes in first measure (can be fractional)
+    -q n     quantize to 1/n notes (e. g. 16 for 16th notes)
 ```
+
+The `-i` option specifies an instrument.  If specified, this
+instrument will override all of the Program Change messages (see
+below).  Instruments are:
+
+* W - Piano
+* X - Clarinet
+* Y - Flute
+* Z - Bass
 
 The `-m` option outputs a complete, stand-alone IntyBASIC program,
 rather than an IntyBASIC fragment meant to be included from another
