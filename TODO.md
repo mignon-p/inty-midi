@@ -7,3 +7,5 @@
 ## Version 0.1.1.0
 
 * Use MUSIC SPEED to better handle triplets or unquantized music
+* Use MUSIC VOLUME based on NoteOn velocity
+* Clean up code

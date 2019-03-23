@@ -28,6 +28,9 @@ with the `-p` option (see below).  `inty-midi` does not currently
 support changes in time signature, or changes in tempo, in the middle
 of a file.
 
+For some example MIDI files and the resulting IntyBASIC files produced
+by `inty-midi`, see the [examples](examples) directory.
+
 ## Usage
 
 ```
