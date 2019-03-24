@@ -544,7 +544,7 @@ printVersion = do
   let pkg = "inty-midi " ++ showVersion version
       compiler = compilerName ++ " " ++ showVersion compilerVersion
   putStrLn $ pkg ++ " (built with " ++ compiler ++ ")"
-  putStrLn "© 2019 Patrick Pelletier, BSD 3-clause license"
+  putStrLn "(c) 2019 Patrick Pelletier, BSD 3-clause license"
   putStrLn "code@funwithsoftware.org"
   putStrLn "https://github.com/ppelleti/inty-midi"
 
