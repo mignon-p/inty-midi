@@ -126,6 +126,9 @@ This will copy `inty-midi` to the directory `~/.local/bin`.  You can
 either put that directory on your `PATH`, or copy the binary to
 wherever you want to have it.
 
+If you get a weird-sounding error, such as `AesonException`, it
+probably means your version of `stack` is not new enough.
+
 [1]: https://en.wikipedia.org/wiki/MIDI
 [2]: http://nanochess.org/intybasic.html
 [3]: https://en.wikipedia.org/wiki/Intellivision
