@@ -109,6 +109,11 @@ IntyBASIC supports four instruments: Piano (W), Clarinet (X), Flute
 
 This feature has only been minimally tested.
 
+## Binary releases
+
+Binaries for Mac OS X, Linux, and Windows are available under the
+[releases][13] tab on GitHub.
+
 ## Building from source
 
 `inty-midi` is written in [Haskell][8].  If you're familiar with
@@ -117,14 +122,14 @@ be built with either [Cabal][9] or [Stack][10].
 
 If you're not familiar with Haskell, here's the quick-start:
 
-* Clone this repo
+* Clone this repo (or download a source distribution from [releases][13])
 * [Install Stack][11]
 * In the top directory of this repo, run `stack --install-ghc install`
 * Wait a really long time (it only takes this long the first time)
 
-This will copy `inty-midi` to the directory `~/.local/bin`.  You can
-either put that directory on your `PATH`, or copy the binary to
-wherever you want to have it.
+This will copy `inty-midi` to the directory `~/.local/bin`.  (Or on
+Windows, `%APPDATA%/local/bin`.)  You can either put that directory on
+your `PATH`, or copy the binary to wherever you want to have it.
 
 If you get a weird-sounding error, such as `AesonException`, it
 probably means your version of `stack` is not new enough.
@@ -141,3 +146,4 @@ probably means your version of `stack` is not new enough.
 [10]: https://haskellstack.org/
 [11]: https://docs.haskellstack.org/en/stable/install_and_upgrade/
 [12]: https://en.wikipedia.org/wiki/General_MIDI#Program_change_events
+[13]: https://github.com/ppelleti/inty-midi/releases
