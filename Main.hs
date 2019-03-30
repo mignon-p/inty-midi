@@ -212,7 +212,7 @@ convertNotes :: AbsTime
              -> [NoteLine]
 convertNotes _ [] _ _ = []
 convertNotes now notes (playing, drumsPlaying) insts =
-  let (current, future) = partition isCurrent notes
+  let (current, future) = span isCurrent notes
       isCurrent note = nTime note == now
       drums = filter isDrum current
       notDrums = filter (not . isDrum) current
