@@ -25,6 +25,41 @@ printCentered y color str =
       pos = y * 20 + max x 0
   in indent ++ "PRINT AT " ++ show pos ++ " COLOR " ++ show color ++ ", \"" ++ escape str ++ "\""
 
+splitWords :: Int -> [String] -> ([String], [String])
+splitWords _ [] = ([], [])
+splitWords width (wrd:wrds) =
+  let len = length wrd
+  in if len <= width
+     then let (x, y) = splitWords (width - len - 1) wrds
+          in (wrd : x, y)
+     else ([], wrd : wrds)
+
+wordwrap :: Int -> [String] -> [String]
+wordwrap _ [] = []
+wordwrap width wrds =
+  let (now, later) = splitWords width wrds
+  in unwords now : wordwrap width later
+
+titleToLines :: String -> [String]
+titleToLines = wordwrap 20 . words . map f
+  where f '_' = ' '
+        f x = x
+
+titleLine :: Int -> [String] -> [String]
+titleLine _ [] = []
+titleLine y (ln:lns)
+  | y >= 12 = []
+  | otherwise =
+    let len = fromIntegral $ length ln
+        h = ceiling (len / 20)
+        y' = y + h
+        ln' = take (20 * (12 - y)) ln
+        code = printCentered y 7 ln'
+    in code : titleLine y' lns
+
+titleToCode :: String -> [String]
+titleToCode title = titleLine 6 $ titleToLines title
+
 mainProgram :: String -> String -> [String]
 mainProgram title label =
   [ i "CLS"
@@ -35,8 +70,8 @@ mainProgram title label =
   , "RESTART:"
   , printCentered 3 5 "Press any button"
   , printCentered 4 5 "to play"
-  , printCentered 6 7 title
-  , ""
+  ] ++ titleToCode title ++
+  [ ""
   , i "WHILE CONT = 0"
   , i $ i "WAIT"
   , i "WEND"
@@ -59,6 +94,8 @@ mainProgram title label =
   , i "GOTO RESTART"
   , ""
   , i $ "ASM CFGVAR \"name\" = \"" ++ escape title ++ "\""
+  , ""
+  , i $ "ASM ORG $A000"
   , ""
   ]
   where i = (indent ++)
