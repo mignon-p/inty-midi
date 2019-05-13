@@ -37,7 +37,9 @@ splitWords width (wrd:wrds) =
 wordwrap :: Int -> [String] -> [String]
 wordwrap _ [] = []
 wordwrap width wrds =
-  let (now, later) = splitWords width wrds
+  let (now, later) = case splitWords width wrds of
+                       ([], (x:y)) -> ([x], y)
+                       (x, y) -> (x, y)
   in unwords now : wordwrap width later
 
 titleToLines :: String -> [String]
