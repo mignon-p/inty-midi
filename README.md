@@ -134,6 +134,35 @@ your `PATH`, or copy the binary to wherever you want to have it.
 If you get a weird-sounding error, such as `AesonException`, it
 probably means your version of `stack` is not new enough.
 
+## Using the ECS
+
+If your file requires more than three voices, you will need the ECS to
+run your program.  If you are running on real Intellivision hardware,
+you will need the physical [ECS][4] hardware component.
+
+If you are using [jzIntv][14], you will need to have `ecs.bin` in your
+ROM search path in order to enable emulation of the ECS.  To obtain
+`ecs.bin`, do the following:
+
+* Go to the [jzIntv home page][14], and download the latest jzIntv
+  source archive, which is currently [jzintv-20200712-src.zip][15].
+* Extract the zipfile you downloaded, and find the file
+  `jzintv-20200712-src/src/emscripten/fake_ecs.bin` within it.
+* Rename `fake_ecs.bin` to `ecs.bin` and copy it into a directory
+  which is on your ROM search path.
+
+## Alternatives
+
+This is not the first program to convert MIDI files to IntyBASIC
+programs.  AtariAge user "decle" previously wrote the program
+[MusoCheat][16], which does much the same thing.
+
+The two programs take different approaches, so you may find one or the
+other more to your liking.  MusoCheat gives the user a lot more
+options, although this may also require the user to do more work.
+`inty-midi` has very few options, and tries to "do the right thing"
+automatically.
+
 [1]: https://en.wikipedia.org/wiki/MIDI
 [2]: http://nanochess.org/intybasic.html
 [3]: https://en.wikipedia.org/wiki/Intellivision
@@ -147,3 +176,6 @@ probably means your version of `stack` is not new enough.
 [11]: https://docs.haskellstack.org/en/stable/install_and_upgrade/
 [12]: https://en.wikipedia.org/wiki/General_MIDI#Program_change_events
 [13]: https://github.com/ppelleti/inty-midi/releases
+[14]: http://spatula-city.org/~im14u2c/intv/
+[15]: http://spatula-city.org/~im14u2c/intv/dl/jzintv-20200712-src.zip
+[16]: https://atariage.com/forums/topic/264422-musocheat-adequate-inty-music-for-non-musicians
